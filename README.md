@@ -3,6 +3,7 @@ Choose an anime season (year + season) to automatically add it to Sonarr.
 
 # Usage
 - Clone/download the repository
+- `pip install -r requirements.txt`
 - Edit `config.ini` to your liking (some configuration edits are **required**)
 - Run `script.py`
 - Follow prompts
