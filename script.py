@@ -1,26 +1,43 @@
-import configparser
 import os
 import time
 
 import arrapi
+import configargparse
 import requests
 
 JIKAN_API_BASE_URL = "https://api.jikan.moe/v4"
 JIKAN_API_COOLDOWN = 1  # seconds
 
-config = configparser.ConfigParser(empty_lines_in_values=False)
-config.read("config.ini")
-TMDB_API_KEY = config["API_KEYS"]["TMDB_key"]
+
+configargp = configargparse.ArgParser(default_config_files=["config.ini"])
+
+configargp.add_argument("year", nargs=1, type=int, help="year of the anime season")
+configargp.add_argument("season", nargs=1, choices=["winter", "spring", "summer", "fall"], help="season of the anime season")
+configargp.add_argument("-c", "--config", is_config_file=True, help="config file path")
+configargp.add_argument("-t", "--tmdb_api_key", help="TMDB API key")
+configargp.add_argument("-u", "--base_url", help="Sonarr base URL")
+configargp.add_argument("-a", "--sonarr_api_key", help="Sonarr API key")
+configargp.add_argument("-r", "--root_folder", help="Sonarr root folder")
+configargp.add_argument("-q", "--quality_profile", help="Sonarr quality profile")
+configargp.add_argument("-l", "--language_profile", help="Sonarr language profile")
+configargp.add_argument("-m", "--monitor", choices=["all", "future", "missing", "existing", "pilot", "firstSeason", "latestSeason", "none"], help="Sonarr monitor mode")
+configargp.add_argument("-f", "--season_folder", help="Sonarr season folder")
+configargp.add_argument("-s", "--search", help="Sonarr search on add")
+configargp.add_argument("-n", "--unmet_search", help="Sonarr unmet search on add")
+configargp.add_argument("-p", "--series_type", choices=["standard", "daily", "anime"], help="Sonarr series type")
+configargp.add_argument("-g", "--tags", action="append", help="Sonarr tags")
+
+options = configargp.parse_args()
+
+
+TMDB_API_KEY = options.tmdb_api_key
 
 
 def main() -> None:
     """Main function."""
 
-    clear_screen()
-    print("===== Anime Season for Sonarr =====")
-
-    # Prompt user for year and season
-    year, season = select_season()
+    year = options.year[0]
+    season = options.season[0]
 
     clear_screen()
     print(
@@ -63,7 +80,7 @@ def main() -> None:
         f.close()
 
     # Add series to Sonarr
-    added, exists, not_found, excluded = add_series_to_sonarr(config, tvdb_ids)
+    added, exists, not_found, excluded = add_series_to_sonarr(tvdb_ids)
     print(
         f"Added: {added} - Exists: {exists} - Not Found: {not_found} - Excluded: {excluded}")
 
@@ -71,34 +88,6 @@ def main() -> None:
 def clear_screen() -> None:
     """Clear the screen."""
     os.system('cls' if os.name == 'nt' else 'clear')
-
-
-def select_season() -> tuple[int, str]:
-    """User input year and season. Returns a tuple of year and season."""
-    print("Enter the year (1917 - present):")
-    try:
-        year = int(input())
-        if year < 1917:
-            print("Value out of range. Exiting...")
-            exit()
-    except ValueError:
-        print("Not a number. Exiting...")
-        exit()
-
-    print("\nEnter the season (number):\n1 - Winter\n2 - Spring\n3 - Summer\n4 - Fall")
-    season = input()
-    if season == "1":
-        season = "winter"
-    elif season == "2":
-        season = "spring"
-    elif season == "3":
-        season = "summer"
-    elif season == "4":
-        season = "fall"
-    else:
-        print("Invalid season. Exiting...")
-        exit()
-    return year, season
 
 
 def get_season_list(year: int, season: str) -> list[dict[str, str | int]]:
@@ -249,31 +238,28 @@ def get_TVDB_id_from_TMDB_id(TMDB_id: int) -> int:
     return response["tvdb_id"]
 
 
-def add_series_to_sonarr(config_file, series_tvdb_ids):
-    """placeholder"""
+def add_series_to_sonarr(series_tvdb_ids):
+    """Add given tvdb_ids to Sonarr."""
 
     # Get config
-    base_url = config_file["SONARR"]["base_url"]
-    api_key = config_file["SONARR"]["api_key"]
-    root_folder = config_file["SONARR"]["root_folder"]
-    quality_profile = config_file["SONARR"]["quality_profile"]
-    language_profile = config_file["SONARR"]["language_profile"]
+    base_url = options.base_url
+    api_key = options.sonarr_api_key
+    root_folder = options.root_folder
+    quality_profile = options.quality_profile
+    language_profile = options.language_profile
     if language_profile == "NULL":
         language_profile = None
-    monitor = config_file["SONARR"]["monitor"]
-    season_folder = config_file["SONARR"]["season_folder"]
+    monitor = options.monitor
+    season_folder = options.season_folder.capitalize()
     season_folder = True if season_folder == "True" else False
-    search = config_file["SONARR"]["search"]
+    search = options.search.capitalize()
     search = True if search == "True" else False
-    unmet_search = config_file["SONARR"]["unmet_search"]
+    unmet_search = options.unmet_search.capitalize()
     unmet_search = True if unmet_search == "True" else False
-    series_type = config_file["SONARR"]["series_type"]
-    tags = config_file["SONARR"]["tags"]
-    if tags == "NULL":
+    series_type = options.series_type.lower()
+    tags = options.tags
+    if tags == []:
         tags = None
-    else:
-        tags = tags.split(",")
-        tags = [tag.strip() for tag in tags]
 
     sonarr = arrapi.SonarrAPI(base_url, api_key)
 
