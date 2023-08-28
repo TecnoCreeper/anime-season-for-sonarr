@@ -8,8 +8,7 @@ import requests
 JIKAN_API_BASE_URL = "https://api.jikan.moe/v4"
 JIKAN_API_COOLDOWN = 1  # seconds
 
-config = configparser.ConfigParser(
-    inline_comment_prefixes=";", comment_prefixes=";")
+config = configparser.ConfigParser(empty_lines_in_values=False)
 config.read("config.ini")
 TMDB_API_KEY = config["API_KEYS"]["TMDB_key"]
 
