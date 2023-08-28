@@ -246,7 +246,7 @@ def add_series_to_sonarr(series_tvdb_ids):
     api_key = options.sonarr_api_key
     root_folder = options.root_folder
     quality_profile = options.quality_profile
-    language_profile = options.quality_profile
+    language_profile = options.language_profile
     if language_profile == "NULL":
         language_profile = None
     monitor = options.monitor
@@ -256,7 +256,7 @@ def add_series_to_sonarr(series_tvdb_ids):
     search = True if search == "True" else False
     unmet_search = options.unmet_search.capitalize()
     unmet_search = True if unmet_search == "True" else False
-    series_type = options.series_type.capitalize()
+    series_type = options.series_type.lower()
     tags = options.tags
     if tags == []:
         tags = None
