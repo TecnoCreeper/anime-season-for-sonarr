@@ -14,7 +14,7 @@ def main() -> None:
 
     clear_screen()
     print(
-        f"===== Anime Season Downloader =====\nYear: {year}\nSeason: {season.capitalize()}\n\nSearching...\n(The search can take a while)\n(Teh search will continue even after encountering errors.)\n")
+        f"===== Anime Season For Sonarr =====\nYear: {year}\nSeason: {season.capitalize()}\n\nSearching...\n(The search can take a while)\n(The search will continue even after encountering errors.)\n")
 
     genre_id = get_TMDB_genre_id()
 
@@ -32,12 +32,22 @@ def main() -> None:
         except Exception as e:
             print(e)
             failed_titles.append(title)
-
-    print(
-        f"\nFound {len(tvdb_ids)}/{len(titles)} series. Add to Sonarr? (y/n)")
-    if input() != "y":
-        print("Exiting...")
-        exit()
+    
+    # wheter to auto add or not
+    auto_add = options.auto_add
+    if type(auto_add) is str:
+        auto_add = True if auto_add.capitalize() == "True" else False
+    
+    if auto_add:
+        print(f"\nFound {len(tvdb_ids)}/{len(titles)} series. Adding to Sonarr...")
+    
+    # if auto add is not enabled, ask the user if they want to add the series
+    else:
+        print(
+            f"\nFound {len(tvdb_ids)}/{len(titles)} series. Add to Sonarr? (y/n)")
+        if input().lower() != "y":
+            print("Exiting...")
+            exit()
 
     # log missing titles
     if failed_titles:
@@ -216,23 +226,41 @@ def add_series_to_sonarr(series_tvdb_ids):
 
     # Get config
     base_url = options.base_url
+
     api_key = options.sonarr_api_key
+
     root_folder = options.root_folder
+
     quality_profile = options.quality_profile
+
     language_profile = options.language_profile
     if language_profile == "NULL":
         language_profile = None
+    
     monitor = options.monitor
-    season_folder = options.season_folder.capitalize()
-    season_folder = True if season_folder == "True" else False
-    search = options.search.capitalize()
-    search = True if search == "True" else False
-    unmet_search = options.unmet_search.capitalize()
-    unmet_search = True if unmet_search == "True" else False
+
+    season_folder = options.season_folder
+    if type(season_folder) is str:
+        season_folder = True if season_folder.capitalize() == "True" else False
+    
+    search = options.search
+    if type(search) is str:
+        search = True if search.capitalize() == "True" else False
+    
+    unmet_search = options.unmet_search
+    if type(unmet_search) is str:
+        unmet_search = True if unmet_search.capitalize() == "True" else False
+    
     series_type = options.series_type.lower()
-    tags = options.tags
-    if tags == []:
-        tags = None
+
+    tag = options.tag
+    if tag == []:
+        tag = None
+
+    print(options)
+    print("-----")
+    print(configargp.format_values())
+    exit()
 
     sonarr = arrapi.SonarrAPI(base_url, api_key)
 
@@ -246,7 +274,7 @@ def add_series_to_sonarr(series_tvdb_ids):
         search=search,
         unmet_search=unmet_search,
         series_type=series_type,
-        tags=tags
+        tags=tag
     )
 
     return added, exists, not_found, excluded
@@ -257,23 +285,47 @@ if __name__ == "__main__":
     JIKAN_API_COOLDOWN = 1  # seconds
 
 
-    configargp = configargparse.ArgParser(default_config_files=["config.ini"])
+    configargp = configargparse.ArgParser(prog="anime-season-for-sonarr", description="Automate adding entire anime seasons to Sonarr.", epilog="All options can be set in the config file (apart from <year> and <season>).", default_config_files=["config.ini"])
 
-    configargp.add_argument("year", nargs=1, type=int, help="year of the anime season")
-    configargp.add_argument("season", nargs=1, choices=["winter", "spring", "summer", "fall"], help="season of the anime season")
-    configargp.add_argument("-c", "--config", is_config_file=True, help="config file path")
-    configargp.add_argument("-t", "--tmdb_api_key", help="TMDB API key")
-    configargp.add_argument("-u", "--base_url", help="Sonarr base URL")
-    configargp.add_argument("-a", "--sonarr_api_key", help="Sonarr API key")
-    configargp.add_argument("-r", "--root_folder", help="Sonarr root folder")
-    configargp.add_argument("-q", "--quality_profile", help="Sonarr quality profile")
-    configargp.add_argument("-l", "--language_profile", help="Sonarr language profile")
-    configargp.add_argument("-m", "--monitor", choices=["all", "future", "missing", "existing", "pilot", "firstSeason", "latestSeason", "none"], help="Sonarr monitor mode")
-    configargp.add_argument("-f", "--season_folder", help="Sonarr season folder")
-    configargp.add_argument("-s", "--search", help="Sonarr search on add")
-    configargp.add_argument("-n", "--unmet_search", help="Sonarr unmet search on add")
-    configargp.add_argument("-p", "--series_type", choices=["standard", "daily", "anime"], help="Sonarr series type")
-    configargp.add_argument("-g", "--tags", action="append", help="Sonarr tags")
+    configargp.add_argument("year", nargs=1, type=int, help="year of the anime season.")
+
+    configargp.add_argument("season", nargs=1, choices=["winter", "spring", "summer", "fall"], help="season of the anime season.")
+
+    configargp.add_argument("-c", "--config", is_config_file=True, help="set config file path (default: ./config.ini). Note: you MUST use this option if the config file is not inside the direcotry you are running the script from.")
+
+    configargp.add_argument("-k", "--tmdb_api_key", help="Set [TMDB] API key.")
+
+    configargp.add_argument("-u", "--base_url", help="Set [Sonarr] base URL.")
+
+    configargp.add_argument("-a", "--sonarr_api_key", help="Set [Sonarr] API key.")
+
+    configargp.add_argument("-r", "--root_folder", help="Set [Sonarr] series root folder.")
+
+    configargp.add_argument("-q", "--quality_profile", help="Set [Sonarr] quality profile.")
+
+    configargp.add_argument("-l", "--language_profile", help="Set [Sonarr] language profile (Sonarr v3 only).")
+
+    configargp.add_argument("-m", "--monitor", choices=["all", "future", "missing", "existing", "pilot", "firstSeason", "latestSeason", "none"], help="Set [Sonarr] series monitor mode.")
+    
+    # season_folder_group = configargp.add_mutually_exclusive_group(required=False)
+    configargp.add_argument("--season_folder", dest="season_folder", action="store_true", help="[Sonarr] use season folder.")
+    configargp.add_argument("--no_season_folder", dest="season_folder", action="store_false", help="[Sonarr] don't use season folder.")
+
+    # search_group = configargp.add_mutually_exclusive_group(required=False)
+    configargp.add_argument("--search", dest="search", action="store_true", help="[Sonarr] start searching for missing episodes on add.")
+    configargp.add_argument("--no_search", dest="search", action="store_false", help="[Sonarr] don't start searching for missing episodes on add.")
+
+    # unmet_search_group = configargp.add_mutually_exclusive_group(required=False)
+    configargp.add_argument("--unmet_search", dest="unmet_search", action="store_true", help="[Sonarr] start search for cutoff unmet episodes on add.")
+    configargp.add_argument("--no_unmet_search", dest="unmet_search", action="store_false", help="[Sonarr] don't start search for cutoff unmet episodes on add.")
+
+    configargp.add_argument("-p", "--series_type", choices=["standard", "daily", "anime"], help="Set [Sonarr] series type.")
+
+    configargp.add_argument("-t", "--tag", action="append", help="[Sonarr] tag(s) to add, can be used multiple times to add multiple tags. Example: -t anime -t seasonal -t qBit")
+
+    # auto_add_group = configargp.add_mutually_exclusive_group(required=False)
+    configargp.add_argument("--auto_add", dest="auto_add", action="store_true", help="Add to [Sonarr] automatically without asking.")
+    configargp.add_argument("--no_auto_add", dest="auto_add", action="store_false", help="Ask whether or not to add to [Sonarr].")
 
     options = configargp.parse_args()
 
