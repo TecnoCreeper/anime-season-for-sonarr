@@ -5,33 +5,6 @@ import arrapi
 import configargparse
 import requests
 
-JIKAN_API_BASE_URL = "https://api.jikan.moe/v4"
-JIKAN_API_COOLDOWN = 1  # seconds
-
-
-configargp = configargparse.ArgParser(default_config_files=["config.ini"])
-
-configargp.add_argument("year", nargs=1, type=int, help="year of the anime season")
-configargp.add_argument("season", nargs=1, choices=["winter", "spring", "summer", "fall"], help="season of the anime season")
-configargp.add_argument("-c", "--config", is_config_file=True, help="config file path")
-configargp.add_argument("-t", "--tmdb_api_key", help="TMDB API key")
-configargp.add_argument("-u", "--base_url", help="Sonarr base URL")
-configargp.add_argument("-a", "--sonarr_api_key", help="Sonarr API key")
-configargp.add_argument("-r", "--root_folder", help="Sonarr root folder")
-configargp.add_argument("-q", "--quality_profile", help="Sonarr quality profile")
-configargp.add_argument("-l", "--language_profile", help="Sonarr language profile")
-configargp.add_argument("-m", "--monitor", choices=["all", "future", "missing", "existing", "pilot", "firstSeason", "latestSeason", "none"], help="Sonarr monitor mode")
-configargp.add_argument("-f", "--season_folder", help="Sonarr season folder")
-configargp.add_argument("-s", "--search", help="Sonarr search on add")
-configargp.add_argument("-n", "--unmet_search", help="Sonarr unmet search on add")
-configargp.add_argument("-p", "--series_type", choices=["standard", "daily", "anime"], help="Sonarr series type")
-configargp.add_argument("-g", "--tags", action="append", help="Sonarr tags")
-
-options = configargp.parse_args()
-
-
-TMDB_API_KEY = options.tmdb_api_key
-
 
 def main() -> None:
     """Main function."""
@@ -41,7 +14,7 @@ def main() -> None:
 
     clear_screen()
     print(
-        f"===== Anime Season Downloader =====\nYear: {year}\nSeason: {season.capitalize()}\n\nSearching...\n(The search takes a while, it's not stuck.)\n(It will continue even after encountering errors.)\n")
+        f"===== Anime Season Downloader =====\nYear: {year}\nSeason: {season.capitalize()}\n\nSearching...\n(The search can take a while)\n(Teh search will continue even after encountering errors.)\n")
 
     genre_id = get_TMDB_genre_id()
 
@@ -280,4 +253,30 @@ def add_series_to_sonarr(series_tvdb_ids):
 
 
 if __name__ == "__main__":
+    JIKAN_API_BASE_URL = "https://api.jikan.moe/v4"
+    JIKAN_API_COOLDOWN = 1  # seconds
+
+
+    configargp = configargparse.ArgParser(default_config_files=["config.ini"])
+
+    configargp.add_argument("year", nargs=1, type=int, help="year of the anime season")
+    configargp.add_argument("season", nargs=1, choices=["winter", "spring", "summer", "fall"], help="season of the anime season")
+    configargp.add_argument("-c", "--config", is_config_file=True, help="config file path")
+    configargp.add_argument("-t", "--tmdb_api_key", help="TMDB API key")
+    configargp.add_argument("-u", "--base_url", help="Sonarr base URL")
+    configargp.add_argument("-a", "--sonarr_api_key", help="Sonarr API key")
+    configargp.add_argument("-r", "--root_folder", help="Sonarr root folder")
+    configargp.add_argument("-q", "--quality_profile", help="Sonarr quality profile")
+    configargp.add_argument("-l", "--language_profile", help="Sonarr language profile")
+    configargp.add_argument("-m", "--monitor", choices=["all", "future", "missing", "existing", "pilot", "firstSeason", "latestSeason", "none"], help="Sonarr monitor mode")
+    configargp.add_argument("-f", "--season_folder", help="Sonarr season folder")
+    configargp.add_argument("-s", "--search", help="Sonarr search on add")
+    configargp.add_argument("-n", "--unmet_search", help="Sonarr unmet search on add")
+    configargp.add_argument("-p", "--series_type", choices=["standard", "daily", "anime"], help="Sonarr series type")
+    configargp.add_argument("-g", "--tags", action="append", help="Sonarr tags")
+
+    options = configargp.parse_args()
+
+
+    TMDB_API_KEY = options.tmdb_api_key
     main()
