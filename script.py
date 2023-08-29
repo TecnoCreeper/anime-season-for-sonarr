@@ -289,9 +289,9 @@ def add_series_to_sonarr(shows: list[Show]) -> any:
     
     series_type = options.series_type.lower()
 
-    tag = options.tag
-    if tag == []:
-        tag = None
+    tags = options.tags
+    if tags == []:
+        tags = None
 
     tvdb_ids = [show.get_tvdb_id() for show in shows]
 
@@ -307,7 +307,7 @@ def add_series_to_sonarr(shows: list[Show]) -> any:
         search=search,
         unmet_search=unmet_search,
         series_type=series_type,
-        tags=tag
+        tags=tags
     )
 
     return added, exists, not_found, excluded
@@ -337,7 +337,7 @@ if __name__ == "__main__":
     configargp.add_argument("--unmet_search", dest="unmet_search", action="store_true", help="[Sonarr] start search for cutoff unmet episodes on add.")
     configargp.add_argument("--no_unmet_search", dest="unmet_search", action="store_false", help="[Sonarr] don't start search for cutoff unmet episodes on add.")
     configargp.add_argument("-p", "--series_type", choices=["standard", "daily", "anime"], help="Set [Sonarr] series type.")
-    configargp.add_argument("-t", "--tag", action="append", help="[Sonarr] tag(s) to add, can be used multiple times to add multiple tags. Example: -t anime -t seasonal -t qBit")
+    configargp.add_argument("-t", "--tags", action="append", help="[Sonarr] tag(s) to add, can be used multiple times to add multiple tags. Example: -t anime -t seasonal -t qBit")
     # select_all_group = configargp.add_mutually_exclusive_group(required=False)
     configargp.add_argument("--select_all", dest="select_all", action="store_true", help="Add to [Sonarr] automatically without asking.")
     configargp.add_argument("--no_select_all", dest="select_all", action="store_false", help="Ask whether or not to add to [Sonarr].")
