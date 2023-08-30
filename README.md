@@ -3,9 +3,9 @@ Choose an anime season (year + season) to automatically add it to Sonarr.
 
 # Video and screenshot
 
-https://raw.githubusercontent.com/TecnoCreeper/anime-season-for-sonarr/main/media/video1-2023-08-30_09.58.49.mp4
+https://github.com/TecnoCreeper/anime-season-for-sonarr/assets/110969133/b3934008-e74a-44dc-8816-6f4b930797b3
 
-![Screenshot1](https://raw.githubusercontent.com/TecnoCreeper/anime-season-for-sonarr/main/media/screenshot1.png)
+![screenshot1](https://github.com/TecnoCreeper/anime-season-for-sonarr/assets/110969133/86feda0d-78e1-44d8-bfdd-d5da2517acb9)
 
 # Download / Installation
 - Clone/download the repository  
