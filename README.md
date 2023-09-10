@@ -20,7 +20,7 @@ https://github.com/TecnoCreeper/anime-season-for-sonarr/assets/110969133/b393400
 
 - (OPTIONAL) Edit the other options to your liking
 
-Note: every option in the config file can be overridden by command line arguments (so technically you don't need to edit the config file if you provide the required arguments every time).
+Note: every option in the config file can be overridden by command line arguments (so technically you don't need to edit the config file if you pass the required arguments every time).
 
 # Usage
 Run the script with `-h` or `--help` to view options.
@@ -30,6 +30,8 @@ If you configured `config.ini` you can run
 `python ./script.py <year> <season>`
 
 replacing \<year> with the wanted year and \<season> with the wanted season (winter, spring, summer or fall, lowercase).
+
+By default the english titles are shown, this behaviour can be changed using the `--romaji` flag.
 
 Note: if the config file is not inside the directory from which you are running the script from you MUST provide the path to the config file using `-c <path>` or `--config <path>`.
 

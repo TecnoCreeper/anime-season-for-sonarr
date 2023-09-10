@@ -76,7 +76,11 @@ def main() -> None:
     # if select_all is not enabled, ask the user which series they want to add
     if not select_all:
         prompt = "Select series to add to Sonarr.\nControls: j/down_arrow = down, k/up_arrow = up, space/right_arrow = select/unselect, enter = confirm"
-        choices = [show.get_english_title() for show in shows]
+        romaji = options.romaji
+        if romaji is True:
+            choices = [show.get_romaji_title() for show in shows]
+        else:
+            choices = [show.get_english_title() for show in shows]
         selected_shows: list[tuple[str, int]] = pick.pick(title=prompt, options=choices, multiselect=True)
     
         if selected_shows == []:
@@ -359,7 +363,7 @@ def add_series_to_sonarr(shows: list[Show]) -> any:
 
 if __name__ == "__main__":
 
-    configargp = configargparse.ArgParser(prog="anime-season-for-sonarr", description="Automate adding entire anime seasons to Sonarr.", epilog="All options can be set in the config file (apart from <year> and <season>).", default_config_files=["config.ini"])
+    configargp = configargparse.ArgParser(prog="anime-season-for-sonarr", description="Automate bulk adding anime seasons to Sonarr.", epilog="Most options can be set in the config file.", default_config_files=["config.ini"])
 
     configargp.add_argument("year", nargs=1, type=int, help="year of the anime season.")
     configargp.add_argument("season", nargs=1, choices=["winter", "spring", "summer", "fall"], help="season of the anime season. Lowercase.")
@@ -371,20 +375,17 @@ if __name__ == "__main__":
     configargp.add_argument("-q", "--quality_profile", help="Set [Sonarr] quality profile.")
     configargp.add_argument("-l", "--language_profile", help="Set [Sonarr] language profile (Sonarr v3 only).")
     configargp.add_argument("-m", "--monitor", choices=["all", "future", "missing", "existing", "pilot", "firstSeason", "latestSeason", "none"], help="Set [Sonarr] series monitor mode.")
-    # season_folder_group = configargp.add_mutually_exclusive_group(required=False)
     configargp.add_argument("--season_folder", dest="season_folder", action="store_true", help="[Sonarr] use season folder.")
     configargp.add_argument("--no_season_folder", dest="season_folder", action="store_false", help="[Sonarr] don't use season folder.")
-    # search_group = configargp.add_mutually_exclusive_group(required=False)
     configargp.add_argument("--search", dest="search", action="store_true", help="[Sonarr] start searching for missing episodes on add.")
     configargp.add_argument("--no_search", dest="search", action="store_false", help="[Sonarr] don't start searching for missing episodes on add.")
-    # unmet_search_group = configargp.add_mutually_exclusive_group(required=False)
     configargp.add_argument("--unmet_search", dest="unmet_search", action="store_true", help="[Sonarr] start search for cutoff unmet episodes on add.")
     configargp.add_argument("--no_unmet_search", dest="unmet_search", action="store_false", help="[Sonarr] don't start search for cutoff unmet episodes on add.")
     configargp.add_argument("-p", "--series_type", choices=["standard", "daily", "anime"], help="Set [Sonarr] series type.")
     configargp.add_argument("-t", "--tags", action="append", help="[Sonarr] tag(s) to add, can be used multiple times to add multiple tags. Example: -t anime -t seasonal -t qBit")
-    # select_all_group = configargp.add_mutually_exclusive_group(required=False)
     configargp.add_argument("--select_all", dest="select_all", action="store_true", help="Add to [Sonarr] automatically without asking.")
     configargp.add_argument("--no_select_all", dest="select_all", action="store_false", help="Ask whether or not to add to [Sonarr].")
+    configargp.add_argument("--romaji", help="Show Romaji titles instead of English titles.", action="store_true")
 
     options = configargp.parse_args()
     TMDB_API_KEY = options.tmdb_api_key  # probably should handle the key better
