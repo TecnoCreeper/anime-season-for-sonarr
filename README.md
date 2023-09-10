@@ -1,5 +1,5 @@
 # anime-season-for-sonarr
-Choose an anime season (year + season) to automatically add it to Sonarr.
+Choose an anime season (year + season) and select which ones you want to add to Sonarr.
 
 # Video and screenshot
 
@@ -7,7 +7,7 @@ https://github.com/TecnoCreeper/anime-season-for-sonarr/assets/110969133/b393400
 
 ![screenshot1](https://github.com/TecnoCreeper/anime-season-for-sonarr/assets/110969133/86feda0d-78e1-44d8-bfdd-d5da2517acb9)
 
-# Download / Installation
+# Download
 - Clone/download the repository  
 `git clone https://github.com/TecnoCreeper/anime-season-for-sonarr.git`
 - `cd anime-season-for-sonarr`
@@ -20,7 +20,7 @@ https://github.com/TecnoCreeper/anime-season-for-sonarr/assets/110969133/b393400
 
 - (OPTIONAL) Edit the other options to your liking
 
-Note: every option in the config file can be overridden by command line arguments (so technically you don't need to edit the config file if you supply every argument every time).
+Note: every option in the config file can be overridden by command line arguments (so technically you don't need to edit the config file if you provide the required arguments every time).
 
 # Usage
 Run the script with `-h` or `--help` to view options.
@@ -29,12 +29,16 @@ If you configured `config.ini` you can run
 
 `python ./script.py <year> <season>`
 
-replacing \<year> with the wanted year and \<season> with the wanted season (winter, spring, summer or fall).
+replacing \<year> with the wanted year and \<season> with the wanted season (winter, spring, summer or fall, lowercase).
 
 Note: if the config file is not inside the directory from which you are running the script from you MUST provide the path to the config file using `-c <path>` or `--config <path>`.
 
-# Info
-- A log file will be crated inside the working directory in case some show couldn't be found.
+# Additional info
+- A log file will be created inside the working directory in case the script encounters errors.
 
 # Credits
 This product uses the TMDB API but is not endorsed or certified by TMDB.
+
+Dependencies:
+- [pick](https://github.com/wong2/pick)
+- [arrapi](https://github.com/meisnate12/ArrAPI)

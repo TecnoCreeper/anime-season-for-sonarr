@@ -1,2 +1,4 @@
 .venv/
-log_missing_titles.txt
+log_error_titles.txt
+.vscode/
+__pycache__/
