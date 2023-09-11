@@ -42,5 +42,6 @@ Note: if the config file is not inside the directory from which you are running 
 This product uses the TMDB API but is not endorsed or certified by TMDB.
 
 Dependencies:
-- [pick](https://github.com/wong2/pick)
-- [arrapi](https://github.com/meisnate12/ArrAPI)
+- [ArrAPI](https://github.com/meisnate12/ArrAPI)
+- [ConfigArgParse](https://github.com/bw2/ConfigArgParse)
+- [questionary](https://github.com/tmbo/questionary)
