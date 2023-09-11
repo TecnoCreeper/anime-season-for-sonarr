@@ -11,12 +11,12 @@ class Show:
     def __init__(
         self, english_title: str, romaji_title: str, anilist_id: int, air_year: int
     ) -> None:
-        self.english_title = english_title
-        self.romaji_title = romaji_title
-        self.anilist_id = anilist_id
-        self.air_year = air_year
-        self.tmdb_id = None
-        self.tvdb_id = None
+        self.english_title: str = english_title
+        self.romaji_title: str = romaji_title
+        self.anilist_id: int = anilist_id
+        self.air_year: int = air_year
+        self.tmdb_id: int | None = None
+        self.tvdb_id: int | None = None
 
     def __str__(self) -> str:
         return f"English title: {self.english_title} - Romaji title {self.romaji_title} - Anilist ID: {self.anilist_id} - TMDB ID: {self.tmdb_id} - TVDB ID: {self.tvdb_id}"
@@ -37,18 +37,18 @@ class Show:
         return self.air_year
 
     def get_tmdb_id(self) -> int:
-        if type(self.tmdb_id) is not int:
-            raise Exception(
-                f"[ERROR] TMDB ID for <{self}> is not an int, type: {type(self.tmdb_id)}."
-            )
-        return self.tmdb_id
+        if type(self.tmdb_id) is int:
+            return self.tmdb_id
+        raise TypeError(
+            f"[ERROR] TMDB ID for <{self}> is not an int, type: {type(self.tmdb_id)}."
+        )
 
     def get_tvdb_id(self) -> int:
-        if type(self.tvdb_id) is not int:
-            raise Exception(
-                f"[ERROR] TVDB ID for <{self}> is not an int, type: {type(self.tvdb_id)}."
-            )
-        return self.tvdb_id
+        if type(self.tvdb_id) is int:
+            return self.tvdb_id
+        raise TypeError(
+            f"[ERROR] TVDB ID for <{self}> is not an int, type: {type(self.tvdb_id)}."
+        )
 
     def set_tmdb_id(self, tmdb_id: int) -> None:
         self.tmdb_id = tmdb_id
@@ -72,16 +72,16 @@ def main() -> None:
         f"===== Anime Season For Sonarr =====\nYear: {year}\nSeason: {season.capitalize()}\n\nSearching...\n(The search can take a while)\n(The search will continue even after encountering [ERROR]s.)\n"
     )
 
-    genre_id = get_TMDB_genre_id()
+    genre_id: int = get_TMDB_genre_id()
 
-    shows = get_season_list(year, season)
+    shows: list[Show] = get_season_list(year, season)
 
     # whether to automatically select all or not
     select_all = options.select_all
     if (
         type(select_all) is str
     ):  # workaround for how configargparse handles bools in config files
-        select_all = True if select_all.capitalize() == "True" else False
+        select_all: bool = True if select_all.capitalize() == "True" else False
 
     # contains shows that are found successfully
     shows_success: list[Show] = []
@@ -89,37 +89,39 @@ def main() -> None:
 
     for show in shows:
         try:
-            show = search_TMDB_for_show(show, genre_id)
-            tvdb_id = get_TVDB_id_from_TMDB_id(show.get_tmdb_id())
+            show: Show = search_TMDB_for_show(show, genre_id)
+            tvdb_id: int = get_TVDB_id_from_TMDB_id(show.get_tmdb_id())
             show.set_tvdb_id(tvdb_id)
             shows_success.append(show)
         except Exception as e:
             print(e)
             shows_error.append(show)
 
-    sonarr = arrapi.SonarrAPI(SONARR_BASE_URL, SONARR_API_KEY)
-    shows_exist_sonarr = get_shows_in_sonarr(sonarr)
+    sonarr: arrapi.SonarrAPI = arrapi.SonarrAPI(SONARR_BASE_URL, SONARR_API_KEY)
+    shows_exist_sonarr: list[int] = get_shows_in_sonarr(sonarr)
 
     # if select_all is not enabled, ask the user which series they want to add
     if select_all is False:
-        selected_shows = interactive_selection(shows_success, shows_exist_sonarr)
+        selected_shows: list[int] = interactive_selection(
+            shows_success, shows_exist_sonarr
+        )
     else:
         print("Select all enabled. Adding all shows...")
-        selected_shows = shows_success
+        selected_shows: list[int] = [show.get_tvdb_id() for show in shows_success]
 
-    # log missing titles
+    # log error titles if there are any
     if shows_error:
         try:
-            f = open("log_error_titles.txt", "a")
+            file = open("log_error_titles.txt", "a", encoding="utf-8")
         except FileNotFoundError:
-            f = open("log_error_titles.txt", "w")
-            f.close()
-            f = open("log_error_titles.txt", "a")
-        f.write(f"Year: {year} - Season: {season.capitalize()}\n")
+            file = open("log_error_titles.txt", "w", encoding="utf-8")
+            file.close()
+            file = open("log_error_titles.txt", "a", encoding="utf-8")
+        file.write(f"Year: {year} - Season: {season.capitalize()}\n")
         for show in shows_error:
-            f.write(f"{show}\n")
-        f.write("-----\n")
-        f.close()
+            file.write(f"{show}\n")
+        file.write("-----\n")
+        file.close()
 
     # Add series to Sonarr
     added, exists, not_found, excluded = add_series_to_sonarr(selected_shows, sonarr)
@@ -162,7 +164,7 @@ def interactive_selection(
     ).ask()
 
     if selected_shows is None:
-        raise Exception("[ERROR] No shows selected.")
+        raise TypeError("[ERROR] No shows selected.")
 
     return selected_shows
 
@@ -211,7 +213,7 @@ def get_season_list(year: int, season: str) -> list[Show]:
         variables = {"page": page, "season": season.upper(), "seasonYear": year}
 
         response = requests.post(
-            ANILIST_API_URL, json={"query": query, "variables": variables}
+            ANILIST_API_URL, json={"query": query, "variables": variables}, timeout=60
         ).json()
         time.sleep(ANILIST_API_COOLDOWN)  # Avoid rate limiting
 
@@ -228,7 +230,7 @@ def get_season_list(year: int, season: str) -> list[Show]:
                 )
             )
 
-    if not shows:
+    if not shows:  # if no shows are found (the list is empty)
         raise Exception(
             f"[ERROR] No titles found from Anilist API. Series for <year: {year} season: {season}> don't exist."
         )
@@ -240,7 +242,7 @@ def build_TMDB_genre_dict() -> dict[str, int]:
     """Build a list of TMDB genres."""
 
     url = f"https://api.themoviedb.org/3/genre/movie/list?api_key={TMDB_API_KEY}"
-    response = requests.get(url).json()
+    response = requests.get(url, timeout=60).json()
     genre_dict = {}
     for genre in response["genres"]:
         genre_dict.update({genre["name"]: genre["id"]})
@@ -251,24 +253,24 @@ def get_TMDB_genre_id(genre_to_find: str = "Animation") -> int:
     """Get the TMDB genre ID for anime."""
 
     genre_dict = build_TMDB_genre_dict()
-    for genre, id in genre_dict.items():
-        if genre == genre_to_find:
-            return id
+    for genre_name, genre_id in genre_dict.items():
+        if genre_name == genre_to_find:
+            return genre_id
     raise Exception(f"[ERROR] Genre '{genre_to_find}' not found.")
 
 
 def search_TMDB_for_show(show: Show, genre_id: int) -> Show:
-    """Search for a show on TMDB."""
+    """Search for a show on TMDB. Return updated Show."""
 
     query = show.get_english_title().replace(" ", "+")
     url = f"https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={query}&first_air_date_year={show.get_air_year()}&page=1"
-    response = requests.get(url).json()
+    response = requests.get(url, timeout=60).json()
 
     if response["total_results"] == 0:
         # try using the romaji title
         query = show.get_romaji_title().replace(" ", "+")
         url = f"https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={query}&first_air_date_year={show.get_air_year()}&page=1"
-        response = requests.get(url).json()
+        response = requests.get(url, timeout=60).json()
 
         if response["total_results"] == 0:
             # Search recursively for parent story
@@ -291,15 +293,17 @@ def search_TMDB_for_show(show: Show, genre_id: int) -> Show:
             current_page += 1
             url = f"https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&first_air_date_year={show.get_air_year()}&query={query}&page={current_page}"
             time.sleep(ANILIST_API_COOLDOWN)  # Avoid rate limiting
-            response = requests.get(url).json()
+            response = requests.get(url, timeout=60).json()
 
         raise Exception(
             f"[ERROR] No result(s) with <genre id: {genre_id}> found for <{show}> on TMDB."
         )
 
+    raise Exception("-- this shouldn't happen, please report --")
+
 
 def search_previous_season(show: Show) -> Show:
-    """Search for the previous season of a show via Anilist API."""
+    """Search for the previous season of a show via Anilist API. Returns the previous season (Show object)"""
 
     query = """
     query ($id: Int) {
@@ -324,7 +328,7 @@ def search_previous_season(show: Show) -> Show:
     variables = {"id": show.get_anilist_id()}
 
     response = requests.post(
-        ANILIST_API_URL, json={"query": query, "variables": variables}
+        ANILIST_API_URL, json={"query": query, "variables": variables}, timeout=60
     ).json()
     time.sleep(ANILIST_API_COOLDOWN)  # Avoid rate limiting
 
@@ -364,7 +368,7 @@ def get_TVDB_id_from_TMDB_id(tmdb_id: int) -> int:
     url = (
         f"https://api.themoviedb.org/3/tv/{tmdb_id}/external_ids?api_key={TMDB_API_KEY}"
     )
-    response = requests.get(url).json()
+    response = requests.get(url, timeout=60).json()
 
     if "tvdb_id" not in response:
         raise Exception(f"[ERROR] No TVDB ID field for <TMDB ID: {tmdb_id}>.")
@@ -376,7 +380,7 @@ def get_TVDB_id_from_TMDB_id(tmdb_id: int) -> int:
     return tvdb_id
 
 
-def add_series_to_sonarr(shows: list[Show], sonarr: arrapi.SonarrAPI) -> any:
+def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):
     """Add given shows to Sonarr."""
 
     # Get config
@@ -406,8 +410,6 @@ def add_series_to_sonarr(shows: list[Show], sonarr: arrapi.SonarrAPI) -> any:
     tags = options.tags
     if tags == []:
         tags = None
-
-    tvdb_ids = [show.get_tvdb_id() for show in shows]
 
     added, exists, not_found, excluded = sonarr.add_multiple_series(
         ids=tvdb_ids,
