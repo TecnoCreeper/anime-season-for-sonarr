@@ -1,5 +1,5 @@
 .venv/
-log_error_titles.txt
+log_search_errors.txt
 .vscode/
 __pycache__/
 .ruff_cache/

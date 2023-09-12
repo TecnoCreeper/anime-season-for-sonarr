@@ -19,7 +19,7 @@ class Show:
         self.tvdb_id: int | None = None
 
     def __str__(self) -> str:
-        return f"English title: {self.english_title} - Romaji title {self.romaji_title} - Anilist ID: {self.anilist_id} - TMDB ID: {self.tmdb_id} - TVDB ID: {self.tvdb_id}"
+        return f"English title: {self.english_title} - Romaji title {self.romaji_title} - Air year: {self.air_year} - Anilist ID: {self.anilist_id} - TMDB ID: {self.tmdb_id} - TVDB ID: {self.tvdb_id}"
 
     def __repr__(self) -> str:
         return str(self)
@@ -76,18 +76,10 @@ def main() -> None:
 
     shows: list[Show] = get_season_list(year, season)
 
-    # whether to automatically select all or not
-    select_all = options.select_all
-    if (
-        type(select_all) is str
-    ):  # workaround for how configargparse handles bools in config files
-        select_all: bool = True if select_all.capitalize() == "True" else False
-
-    # contains shows that are found successfully
-    shows_success: list[Show] = []
+    shows_success: list[Show] = []  # contains shows that are found successfully
     shows_error: list[Show] = []  # contains shows that encountered an error
 
-    for show in shows:
+    for show in shows:  # try to add the tmdb_id and the tvdb_id to each show
         try:
             show: Show = search_TMDB_for_show(show, genre_id)
             tvdb_id: int = get_TVDB_id_from_TMDB_id(show.get_tmdb_id())
@@ -97,36 +89,45 @@ def main() -> None:
             print(e)
             shows_error.append(show)
 
-    sonarr: arrapi.SonarrAPI = arrapi.SonarrAPI(SONARR_BASE_URL, SONARR_API_KEY)
-    shows_exist_sonarr: list[int] = get_shows_in_sonarr(sonarr)
-
-    # if select_all is not enabled, ask the user which series they want to add
-    if select_all is False:
-        selected_shows: list[int] = interactive_selection(
-            shows_success, shows_exist_sonarr
-        )
-    else:
-        print("Select all enabled. Adding all shows...")
-        selected_shows: list[int] = [show.get_tvdb_id() for show in shows_success]
-
-    # log error titles if there are any
+    # log error titles to file if there are any
     if shows_error:
         try:
-            file = open("log_error_titles.txt", "a", encoding="utf-8")
+            file = open("log_search_errors.txt", "a", encoding="utf-8")
         except FileNotFoundError:
-            file = open("log_error_titles.txt", "w", encoding="utf-8")
+            file = open("log_search_errors.txt", "w", encoding="utf-8")
             file.close()
-            file = open("log_error_titles.txt", "a", encoding="utf-8")
+            file = open("log_search_errors.txt", "a", encoding="utf-8")
         file.write(f"Year: {year} - Season: {season.capitalize()}\n")
         for show in shows_error:
             file.write(f"{show}\n")
         file.write("-----\n")
         file.close()
 
+    sonarr: arrapi.SonarrAPI = arrapi.SonarrAPI(SONARR_BASE_URL, SONARR_API_KEY)
+
+    shows_exist_sonarr: list[int] = get_shows_in_sonarr(sonarr)
+
+    # get select_all value from config file or command line argument
+    select_all = options.select_all
+    if (
+        type(select_all) is str
+    ):  # workaround for how configargparse handles bools in config files
+        select_all: bool = True if select_all.capitalize() == "True" else False
+
+    # if select_all is not enabled, ask the user which series they want to add
+    if select_all is False:
+        selected_shows: list[int] = interactive_selection(
+            shows_success, shows_exist_sonarr
+        )
+    else:  # if select all is enabled, add all shows
+        print("Select all enabled. Adding all shows...")
+        selected_shows: list[int] = [show.get_tvdb_id() for show in shows_success]
+
     # Add series to Sonarr
     added, exists, not_found, excluded = add_series_to_sonarr(selected_shows, sonarr)
+
     print(
-        f"Added: {added} - Exists: {exists} - Not Found: {not_found} - Excluded: {excluded}"
+        f"Added: {added}\nExists: {exists}\nNot Found: {not_found}\nExcluded: {excluded}"
     )
 
 
@@ -357,7 +358,7 @@ def search_previous_season(show: Show) -> Show:
     if found is False:
         raise Exception(f"[ERROR] No relations found for <{show}>.")
 
-    show_to_search = parent_story if parent_story is not None else prequel
+    show_to_search: Show = parent_story if parent_story is not None else prequel
 
     return show_to_search
 
@@ -381,7 +382,7 @@ def get_TVDB_id_from_TMDB_id(tmdb_id: int) -> int:
 
 
 def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):
-    """Add given shows to Sonarr."""
+    """Add given TVDB IDs to Sonarr."""
 
     # Get config
     root_folder = options.root_folder
