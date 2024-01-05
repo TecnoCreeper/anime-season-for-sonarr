@@ -10,6 +10,8 @@ import requests
 
 @dataclass
 class Show:
+    """Show dataclass."""
+
     english_title: str
     romaji_title: str
     anilist_id: int
@@ -61,6 +63,7 @@ def main() -> None:
             file = open("log_search_errors.txt", "w", encoding="utf-8")
             file.close()
             file = open("log_search_errors.txt", "a", encoding="utf-8")
+
         file.write(f"Year: {year} - Season: {season.capitalize()}\n")
         for show in shows_error:
             file.write(f"{show}\n")
@@ -78,7 +81,7 @@ def main() -> None:
     select_all = options.select_all
 
     # if select_all is not enabled, ask the user which series they want to add
-    if select_all is False:
+    if not select_all:
         selected_shows: list[int] = interactive_selection(
             shows_success, shows_exist_sonarr
         )
@@ -147,7 +150,7 @@ def get_season_list(year: int, season: str) -> list[Show]:
     page = 1
     has_next_page = None
 
-    while (page == 1) or (has_next_page is True):
+    while (page == 1) or has_next_page:
         query = """
         query ($page: Int, $season: MediaSeason, $seasonYear: Int) {
             Page(page: $page, perPage: 30) {
