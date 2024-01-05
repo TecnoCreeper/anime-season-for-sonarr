@@ -9,14 +9,20 @@ import requests
 
 class Show:
     def __init__(
-        self, english_title: str, romaji_title: str, anilist_id: int, air_year: int
+        self,
+        english_title: str,
+        romaji_title: str,
+        anilist_id: int,
+        air_year: int,
+        tmdb_id: int | None = None,
+        tvdb_id: int | None = None,
     ) -> None:
         self.english_title: str = english_title
         self.romaji_title: str = romaji_title
         self.anilist_id: int = anilist_id
         self.air_year: int = air_year
-        self.tmdb_id: int | None = None
-        self.tvdb_id: int | None = None
+        self.tmdb_id: int | None = tmdb_id
+        self.tvdb_id: int | None = tvdb_id
 
     def __str__(self) -> str:
         return f"English title: {self.english_title} - Romaji title {self.romaji_title} - Air year: {self.air_year} - Anilist ID: {self.anilist_id} - TMDB ID: {self.tmdb_id} - TVDB ID: {self.tvdb_id}"
@@ -36,19 +42,11 @@ class Show:
     def get_air_year(self) -> int:
         return self.air_year
 
-    def get_tmdb_id(self) -> int:
-        if type(self.tmdb_id) is int:
-            return self.tmdb_id
-        raise TypeError(
-            f"[ERROR] TMDB ID for <{self}> is not an int, type: {type(self.tmdb_id)}."
-        )
+    def get_tmdb_id(self) -> int | None:
+        return self.tmdb_id
 
-    def get_tvdb_id(self) -> int:
-        if type(self.tvdb_id) is int:
-            return self.tvdb_id
-        raise TypeError(
-            f"[ERROR] TVDB ID for <{self}> is not an int, type: {type(self.tvdb_id)}."
-        )
+    def get_tvdb_id(self) -> int | None:
+        return self.tvdb_id
 
     def set_tmdb_id(self, tmdb_id: int) -> None:
         self.tmdb_id = tmdb_id
@@ -107,12 +105,7 @@ def main() -> None:
 
     shows_exist_sonarr: list[int] = get_shows_in_sonarr(sonarr)
 
-    # get select_all value from config file or command line argument
     select_all = options.select_all
-    if (
-        type(select_all) is str
-    ):  # workaround for how configargparse handles bools in config files
-        select_all: bool = True if select_all.capitalize() == "True" else False
 
     # if select_all is not enabled, ask the user which series they want to add
     if select_all is False:
@@ -395,16 +388,10 @@ def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):
     monitor = options.monitor
 
     season_folder = options.season_folder
-    if type(season_folder) is str:
-        season_folder = True if season_folder.capitalize() == "True" else False
 
     search = options.search
-    if type(search) is str:
-        search = True if search.capitalize() == "True" else False
 
     unmet_search = options.unmet_search
-    if type(unmet_search) is str:
-        unmet_search = True if unmet_search.capitalize() == "True" else False
 
     series_type = options.series_type.lower()
 
@@ -449,18 +436,18 @@ if __name__ == "__main__":
         is_config_file=True,
         help="set config file path (default: ./config.ini). Note: you MUST use this option if the config file is not inside the direcotry you are running the script from.",
     )
-    configargp.add_argument("-k", "--tmdb_api_key", help="Set [TMDB] API key.")
-    configargp.add_argument("-u", "--base_url", help="Set [Sonarr] base URL.")
-    configargp.add_argument("-a", "--sonarr_api_key", help="Set [Sonarr] API key.")
+    configargp.add_argument("-k", "--tmdb-api-key", help="Set [TMDB] API key.")
+    configargp.add_argument("-u", "--base-url", help="Set [Sonarr] base URL.")
+    configargp.add_argument("-a", "--sonarr-api-key", help="Set [Sonarr] API key.")
     configargp.add_argument(
-        "-r", "--root_folder", help="Set [Sonarr] series root folder."
+        "-r", "--root-folder", help="Set [Sonarr] series root folder."
     )
     configargp.add_argument(
-        "-q", "--quality_profile", help="Set [Sonarr] quality profile."
+        "-q", "--quality-profile", help="Set [Sonarr] quality profile."
     )
     configargp.add_argument(
         "-l",
-        "--language_profile",
+        "--language-profile",
         help="Set [Sonarr] language profile (Sonarr v3 only).",
     )
     configargp.add_argument(
@@ -479,44 +466,41 @@ if __name__ == "__main__":
         help="Set [Sonarr] series monitor mode.",
     )
     configargp.add_argument(
-        "--season_folder",
-        dest="season_folder",
+        "--season-folder",
         action="store_true",
         help="[Sonarr] use season folder.",
     )
     configargp.add_argument(
-        "--no_season_folder",
-        dest="season_folder",
+        "--no-season-folder",
+        dest="season-folder",
         action="store_false",
         help="[Sonarr] don't use season folder.",
     )
     configargp.add_argument(
         "--search",
-        dest="search",
         action="store_true",
         help="[Sonarr] start searching for missing episodes on add.",
     )
     configargp.add_argument(
-        "--no_search",
+        "--no-search",
         dest="search",
         action="store_false",
         help="[Sonarr] don't start searching for missing episodes on add.",
     )
     configargp.add_argument(
-        "--unmet_search",
-        dest="unmet_search",
+        "--unmet-search",
         action="store_true",
         help="[Sonarr] start search for cutoff unmet episodes on add.",
     )
     configargp.add_argument(
-        "--no_unmet_search",
-        dest="unmet_search",
+        "--no-unmet-search",
+        dest="unmet-search",
         action="store_false",
         help="[Sonarr] don't start search for cutoff unmet episodes on add.",
     )
     configargp.add_argument(
-        "-p",
-        "--series_type",
+        "-s",
+        "--series-type",
         choices=["standard", "daily", "anime"],
         help="Set [Sonarr] series type.",
     )
@@ -527,23 +511,38 @@ if __name__ == "__main__":
         help="[Sonarr] tag(s) to add, can be used multiple times to add multiple tags. Example: -t anime -t seasonal -t qBit",
     )
     configargp.add_argument(
-        "--select_all",
-        dest="select_all",
+        "--select-all",
         action="store_true",
         help="Add to [Sonarr] automatically without asking.",
     )
     configargp.add_argument(
-        "--no_select_all",
-        dest="select_all",
+        "--no-select-all",
+        dest="select-all",
         action="store_false",
         help="Ask whether or not to add to [Sonarr].",
     )
     configargp.add_argument(
         "--romaji",
-        help="Show Romaji titles instead of English titles.",
         action="store_true",
+        help="Show Romaji titles instead of English titles.",
+    )
+    configargp.add_argument(
+        "--no-romaji",
+        dest="romaji",
+        action="store_false",
+        help="Show English titles.",
     )
 
+    configargp.set_defaults(
+        tmdb_api_key="ac395b50e4cb14bd5712fa08b936a447",
+        monitor="all",
+        season_fodler=True,
+        seatch=True,
+        unmet_search=True,
+        series_type="anime",
+        select_all=False,
+        romaji=False,
+    )
     options = configargp.parse_args()
     TMDB_API_KEY = options.tmdb_api_key
     SONARR_BASE_URL = options.base_url
