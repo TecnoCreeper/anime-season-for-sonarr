@@ -1,5 +1,6 @@
 import os
 import time
+from dataclasses import dataclass
 
 import arrapi
 import configargparse
@@ -7,52 +8,14 @@ import questionary
 import requests
 
 
+@dataclass
 class Show:
-    def __init__(
-        self,
-        english_title: str,
-        romaji_title: str,
-        anilist_id: int,
-        air_year: int,
-        tmdb_id: int | None = None,
-        tvdb_id: int | None = None,
-    ) -> None:
-        self.english_title: str = english_title
-        self.romaji_title: str = romaji_title
-        self.anilist_id: int = anilist_id
-        self.air_year: int = air_year
-        self.tmdb_id: int | None = tmdb_id
-        self.tvdb_id: int | None = tvdb_id
-
-    def __str__(self) -> str:
-        return f"English title: {self.english_title} - Romaji title {self.romaji_title} - Air year: {self.air_year} - Anilist ID: {self.anilist_id} - TMDB ID: {self.tmdb_id} - TVDB ID: {self.tvdb_id}"
-
-    def __repr__(self) -> str:
-        return str(self)
-
-    def get_english_title(self) -> str:
-        return self.english_title
-
-    def get_romaji_title(self) -> str:
-        return self.romaji_title
-
-    def get_anilist_id(self) -> int:
-        return self.anilist_id
-
-    def get_air_year(self) -> int:
-        return self.air_year
-
-    def get_tmdb_id(self) -> int | None:
-        return self.tmdb_id
-
-    def get_tvdb_id(self) -> int | None:
-        return self.tvdb_id
-
-    def set_tmdb_id(self, tmdb_id: int) -> None:
-        self.tmdb_id = tmdb_id
-
-    def set_tvdb_id(self, tvdb_id: int) -> None:
-        self.tvdb_id = tvdb_id
+    english_title: str
+    romaji_title: str
+    anilist_id: int
+    air_year: int
+    tmdb_id: int | None = None
+    tvdb_id: int | None = None
 
 
 ANILIST_API_COOLDOWN = 0.8  # seconds
@@ -80,9 +43,12 @@ def main() -> None:
     for show in shows:  # try to add the tmdb_id and the tvdb_id to each show
         try:
             show: Show = search_TMDB_for_show(show, genre_id)
-            tvdb_id: int = get_TVDB_id_from_TMDB_id(show.get_tmdb_id())
-            show.set_tvdb_id(tvdb_id)
+            tvdb_id: int = get_TVDB_id_from_TMDB_id(show.tmdb_id)
+            show.tvdb_id = tvdb_id
             shows_success.append(show)
+        except SystemExit as e:
+            print(e)
+            exit(1)
         except Exception as e:
             print(e)
             shows_error.append(show)
@@ -101,7 +67,11 @@ def main() -> None:
         file.write("-----\n")
         file.close()
 
-    sonarr: arrapi.SonarrAPI = arrapi.SonarrAPI(SONARR_BASE_URL, SONARR_API_KEY)
+    try:
+        sonarr: arrapi.SonarrAPI = arrapi.SonarrAPI(SONARR_BASE_URL, SONARR_API_KEY)
+    except Exception as e:
+        print(e)
+        exit(1)
 
     shows_exist_sonarr: list[int] = get_shows_in_sonarr(sonarr)
 
@@ -114,10 +84,16 @@ def main() -> None:
         )
     else:  # if select all is enabled, add all shows
         print("Select all enabled. Adding all shows...")
-        selected_shows: list[int] = [show.get_tvdb_id() for show in shows_success]
+        selected_shows: list[int] = [show.tvdb_id for show in shows_success]
 
-    # Add series to Sonarr
-    added, exists, not_found, excluded = add_series_to_sonarr(selected_shows, sonarr)
+    try:
+        # Add series to Sonarr
+        added, exists, not_found, excluded = add_series_to_sonarr(
+            selected_shows, sonarr
+        )
+    except Exception as e:
+        print(e)
+        exit(1)
 
     print(
         f"Added: {added}\nExists: {exists}\nNot Found: {not_found}\nExcluded: {excluded}"
@@ -129,31 +105,18 @@ def interactive_selection(
 ) -> list[int]:
     """Interactive selection screen. Returns a list of TVDB IDs of the selected shows."""
 
-    romaji = options.romaji
-    if romaji is True:
-        choices = [
-            questionary.Choice(
-                title=show.get_romaji_title(),
-                value=show.get_tvdb_id(),
-                disabled="Anime already exists in Sonarr"
-                if show.get_tvdb_id() in existing_tvdb_ids
-                else None,
-            )
-            for show in all_shows
-        ]
-    else:
-        choices = [
-            questionary.Choice(
-                title=show.get_english_title(),
-                value=show.get_tvdb_id(),
-                disabled="Anime already exists in Sonarr"
-                if show.get_tvdb_id() in existing_tvdb_ids
-                else None,
-            )
-            for show in all_shows
-        ]
+    romaji: bool = options.romaji
 
-    selected_shows = questionary.checkbox(
+    choices = [
+        questionary.Choice(
+            title=show.romaji_title if romaji else show.english_title,
+            value=show.tvdb_id,
+            disabled="Anime already exists in Sonarr" if show.tvdb_id in existing_tvdb_ids else None,  # fmt: skip
+        )
+        for show in all_shows
+    ]
+
+    selected_shows: list[int] | None = questionary.checkbox(
         "Select anime to add to Sonarr:", choices=choices
     ).ask()
 
@@ -253,47 +216,45 @@ def get_TMDB_genre_id(genre_to_find: str = "Animation") -> int:
     raise Exception(f"[ERROR] Genre '{genre_to_find}' not found.")
 
 
-def search_TMDB_for_show(show: Show, genre_id: int) -> Show:
+def search_TMDB_for_show(show: Show, target_genre_id: int) -> Show:
     """Search for a show on TMDB. Return updated Show."""
 
-    query = show.get_english_title().replace(" ", "+")
-    url = f"https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={query}&first_air_date_year={show.get_air_year()}&page=1"
+    COMMON_START_URL = f"https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}"
+
+    query = show.english_title.replace(" ", "+")
+    url = f"{COMMON_START_URL}&query={query}&first_air_date_year={show.air_year}&page=1"  # fmt: skip
     response = requests.get(url, timeout=60).json()
 
+    # if there are no results with the english title try using the romaji one
     if response["total_results"] == 0:
-        # try using the romaji title
-        query = show.get_romaji_title().replace(" ", "+")
-        url = f"https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={query}&first_air_date_year={show.get_air_year()}&page=1"
+        query = show.romaji_title.replace(" ", "+")
+        url = f"{COMMON_START_URL}&query={query}&first_air_date_year={show.air_year}&page=1"
         response = requests.get(url, timeout=60).json()
 
+        # if there are still no results, search recursively for parent story / prequel
         if response["total_results"] == 0:
-            # Search recursively for parent story
-            show = search_previous_season(show)
-            return search_TMDB_for_show(show, genre_id)
+            next_show = search_previous_season(show)
+            return search_TMDB_for_show(next_show, target_genre_id)
 
-    # Iterate through all results and return the one with the correct genre
-    if response["total_results"] != 0:
-        current_page = response["page"]
-        last_page = response["total_pages"]
+    # Iterate through all the results and return the first one with the correct genre and country
+    TARGET_COUNTRIES = ("JP", "CN", "KR", "TW", "HK")
+    current_page = response["page"]
+    last_page = response["total_pages"]
 
-        while current_page <= last_page:
-            for result in response["results"]:
-                if (genre_id in result["genre_ids"]) and (
-                    result["origin_country"][0] in ("JP", "CN", "KR", "TW", "HK")
-                ):
-                    show.set_tmdb_id(int(result["id"]))
-                    return show
+    while current_page <= last_page:
+        for result in response["results"]:
+            if (target_genre_id in result["genre_ids"]) and (result["origin_country"][0] in TARGET_COUNTRIES):  # fmt: skip
+                show.tmdb_id = int(result["id"])
+                return show
 
-            current_page += 1
-            url = f"https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&first_air_date_year={show.get_air_year()}&query={query}&page={current_page}"
-            time.sleep(ANILIST_API_COOLDOWN)  # Avoid rate limiting
-            response = requests.get(url, timeout=60).json()
+        current_page += 1
+        url = f"{COMMON_START_URL}&first_air_date_year={show.air_year}&query={query}&page={current_page}"
+        time.sleep(ANILIST_API_COOLDOWN)  # Avoid rate limiting
+        response = requests.get(url, timeout=60).json()
 
-        raise Exception(
-            f"[ERROR] No result(s) with <genre id: {genre_id}> found for <{show}> on TMDB."
-        )
-
-    raise Exception("-- this shouldn't happen, please report --")
+    raise Exception(
+        f"[ERROR] No result with <genre id: {target_genre_id}> and <target countries: {TARGET_COUNTRIES}> found for <{show}> on TMDB."
+    )
 
 
 def search_previous_season(show: Show) -> Show:
@@ -319,14 +280,13 @@ def search_previous_season(show: Show) -> Show:
     }
     """
 
-    variables = {"id": show.get_anilist_id()}
+    variables = {"id": show.anilist_id}
 
     response = requests.post(
         ANILIST_API_URL, json={"query": query, "variables": variables}, timeout=60
     ).json()
     time.sleep(ANILIST_API_COOLDOWN)  # Avoid rate limiting
 
-    found = False
     parent_story = None
     prequel = None
 
@@ -338,7 +298,6 @@ def search_previous_season(show: Show) -> Show:
                 anilist_id=entry["node"]["id"],
                 air_year=entry["node"]["seasonYear"],
             )
-            found = True
         if entry["relationType"] == "PREQUEL":
             prequel = Show(
                 english_title=entry["node"]["title"]["english"],
@@ -346,12 +305,11 @@ def search_previous_season(show: Show) -> Show:
                 anilist_id=entry["node"]["id"],
                 air_year=entry["node"]["seasonYear"],
             )
-            found = True
 
-    if found is False:
-        raise Exception(f"[ERROR] No relations found for <{show}>.")
+    if (parent_story is None) and (prequel is None):
+        raise Exception(f"[ERROR] No valid relations found for <{show}>.")
 
-    show_to_search: Show = parent_story if parent_story is not None else prequel
+    show_to_search: Show = parent_story if parent_story else prequel
 
     return show_to_search
 
@@ -359,9 +317,7 @@ def search_previous_season(show: Show) -> Show:
 def get_TVDB_id_from_TMDB_id(tmdb_id: int) -> int:
     """Get the TVDB ID from a TMDB ID."""
 
-    url = (
-        f"https://api.themoviedb.org/3/tv/{tmdb_id}/external_ids?api_key={TMDB_API_KEY}"
-    )
+    url = f"https://api.themoviedb.org/3/tv/{tmdb_id}/external_ids?api_key={TMDB_API_KEY}"  # fmt:skip
     response = requests.get(url, timeout=60).json()
 
     if "tvdb_id" not in response:
@@ -377,7 +333,6 @@ def get_TVDB_id_from_TMDB_id(tmdb_id: int) -> int:
 def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):
     """Add given TVDB IDs to Sonarr."""
 
-    # Get config
     root_folder = options.root_folder
     quality_profile = options.quality_profile
 
@@ -386,17 +341,13 @@ def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):
         language_profile = None
 
     monitor = options.monitor
-
     season_folder = options.season_folder
-
     search = options.search
-
     unmet_search = options.unmet_search
-
     series_type = options.series_type.lower()
 
     tags = options.tags
-    if tags == []:
+    if not tags:
         tags = None
 
     added, exists, not_found, excluded = sonarr.add_multiple_series(
@@ -416,41 +367,60 @@ def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):
 
 
 if __name__ == "__main__":
-    configargp = configargparse.ArgParser(
+    parser = configargparse.ArgParser(
         prog="anime-season-for-sonarr",
         description="Automate bulk adding anime seasons to Sonarr.",
-        epilog="Most options can be set in the config file.",
+        epilog="All options can be set from a config file.",
         default_config_files=["config.ini"],
+        formatter_class=configargparse.ArgumentDefaultsRawHelpFormatter,
     )
 
-    configargp.add_argument("year", nargs=1, type=int, help="year of the anime season.")
-    configargp.add_argument(
+    parser.add_argument("year", nargs=1, type=int, help="year of the anime season.")
+    parser.add_argument(
         "season",
         nargs=1,
         choices=["winter", "spring", "summer", "fall"],
         help="season of the anime season. Lowercase.",
     )
-    configargp.add_argument(
+    parser.add_argument(
         "-c",
         "--config",
         is_config_file=True,
-        help="set config file path (default: ./config.ini). Note: you MUST use this option if the config file is not inside the direcotry you are running the script from.",
+        help="set config file path (default behaviour = search for ./config.ini).",
     )
-    configargp.add_argument("-k", "--tmdb-api-key", help="Set [TMDB] API key.")
-    configargp.add_argument("-u", "--base-url", help="Set [Sonarr] base URL.")
-    configargp.add_argument("-a", "--sonarr-api-key", help="Set [Sonarr] API key.")
-    configargp.add_argument(
-        "-r", "--root-folder", help="Set [Sonarr] series root folder."
+    parser.add_argument(
+        "--select-all",
+        action="store_true",
+        help="add automatically to sonarr all anime found without asking.",
     )
-    configargp.add_argument(
-        "-q", "--quality-profile", help="Set [Sonarr] quality profile."
+    parser.add_argument(
+        "--no-select-all",
+        dest="select-all",
+        action="store_false",
+        help="interactive selection of anime to add to sonarr.",
     )
-    configargp.add_argument(
+    parser.add_argument(
+        "--romaji",
+        action="store_true",
+        help="show Romaji titles instead of English titles.",
+    )
+    parser.add_argument(
+        "--no-romaji",
+        dest="romaji",
+        action="store_false",
+        help="show English titles.",
+    )
+    parser.add_argument("-k", "--tmdb-api-key", help="[TMDB] API key.")
+    parser.add_argument("-u", "--base-url", help="[Sonarr] base URL.")
+    parser.add_argument("-a", "--sonarr-api-key", help="[Sonarr] API key.")
+    parser.add_argument("-r", "--root-folder", help="[Sonarr] series root folder.")
+    parser.add_argument("-q", "--quality-profile", help="[Sonarr] quality profile.")
+    parser.add_argument(
         "-l",
         "--language-profile",
-        help="Set [Sonarr] language profile (Sonarr v3 only).",
+        help="[Sonarr] language profile (Sonarr v3 only).",
     )
-    configargp.add_argument(
+    parser.add_argument(
         "-m",
         "--monitor",
         choices=[
@@ -463,87 +433,75 @@ if __name__ == "__main__":
             "latestSeason",
             "none",
         ],
-        help="Set [Sonarr] series monitor mode.",
+        help="[Sonarr] series monitor mode.",
     )
-    configargp.add_argument(
+    parser.add_argument(
         "--season-folder",
         action="store_true",
         help="[Sonarr] use season folder.",
     )
-    configargp.add_argument(
+    parser.add_argument(
         "--no-season-folder",
         dest="season-folder",
         action="store_false",
         help="[Sonarr] don't use season folder.",
     )
-    configargp.add_argument(
+    parser.add_argument(
         "--search",
         action="store_true",
         help="[Sonarr] start searching for missing episodes on add.",
     )
-    configargp.add_argument(
+    parser.add_argument(
         "--no-search",
         dest="search",
         action="store_false",
         help="[Sonarr] don't start searching for missing episodes on add.",
     )
-    configargp.add_argument(
+    parser.add_argument(
         "--unmet-search",
         action="store_true",
         help="[Sonarr] start search for cutoff unmet episodes on add.",
     )
-    configargp.add_argument(
+    parser.add_argument(
         "--no-unmet-search",
         dest="unmet-search",
         action="store_false",
         help="[Sonarr] don't start search for cutoff unmet episodes on add.",
     )
-    configargp.add_argument(
+    parser.add_argument(
         "-s",
         "--series-type",
         choices=["standard", "daily", "anime"],
-        help="Set [Sonarr] series type.",
+        help="[Sonarr] series type.",
     )
-    configargp.add_argument(
+    parser.add_argument(
         "-t",
         "--tags",
         action="append",
         help="[Sonarr] tag(s) to add, can be used multiple times to add multiple tags. Example: -t anime -t seasonal -t qBit",
     )
-    configargp.add_argument(
-        "--select-all",
-        action="store_true",
-        help="Add to [Sonarr] automatically without asking.",
-    )
-    configargp.add_argument(
-        "--no-select-all",
-        dest="select-all",
-        action="store_false",
-        help="Ask whether or not to add to [Sonarr].",
-    )
-    configargp.add_argument(
-        "--romaji",
-        action="store_true",
-        help="Show Romaji titles instead of English titles.",
-    )
-    configargp.add_argument(
-        "--no-romaji",
-        dest="romaji",
-        action="store_false",
-        help="Show English titles.",
-    )
 
-    configargp.set_defaults(
-        tmdb_api_key="ac395b50e4cb14bd5712fa08b936a447",
-        monitor="all",
-        season_fodler=True,
-        seatch=True,
-        unmet_search=True,
-        series_type="anime",
+    parser.set_defaults(
         select_all=False,
+        no_select_all=True,
         romaji=False,
+        no_romaji=True,
+        tmdb_api_key="ac395b50e4cb14bd5712fa08b936a447",
+        base_url=None,
+        sonarr_api_key=None,
+        root_folder=None,
+        quality_profile=None,
+        language=None,
+        monitor="all",
+        season_folder=True,
+        no_season_folder=False,
+        search=True,
+        unmet_search=True,
+        no_unmet_search=False,
+        series_type="anime",
+        tags=[],
     )
-    options = configargp.parse_args()
+    options = parser.parse_args()
     TMDB_API_KEY = options.tmdb_api_key
     SONARR_BASE_URL = options.base_url
     SONARR_API_KEY = options.sonarr_api_key
