@@ -109,7 +109,8 @@ def interactive_selection(
 
     choices = [
         questionary.Choice(
-            title=show.romaji_title if romaji else show.english_title,
+            # prefer the title based on options, fallback to the other if the preferred one is None
+            title=show.romaji_title if (romaji and show.romaji_title) else show.english_title if show.english_title else show.romaji_title,
             value=show.tvdb_id,
             disabled="Anime already exists in Sonarr" if show.tvdb_id in existing_tvdb_ids else None,  # fmt: skip
         )
@@ -221,15 +222,29 @@ def search_TMDB_for_show(show: Show, target_genre_id: int) -> Show:
 
     COMMON_START_URL = f"https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}"
 
-    query = show.english_title.replace(" ", "+")
-    url = f"{COMMON_START_URL}&query={query}&first_air_date_year={show.air_year}&page=1"  # fmt: skip
-    response = requests.get(url, timeout=60).json()
+    try:
+        query = show.english_title.replace(" ", "+")
+        url = f"{COMMON_START_URL}&query={query}&first_air_date_year={show.air_year}&page=1"  # fmt: skip
+        response = requests.get(url, timeout=60).json()
+    except AttributeError:
+        # if the show has no english title mock a response with 0 results
+        response = {"total_results": 0}
+    except Exception as e:
+        print(e)
+        exit(1)
 
     # if there are no results with the english title try using the romaji one
     if response["total_results"] == 0:
-        query = show.romaji_title.replace(" ", "+")
-        url = f"{COMMON_START_URL}&query={query}&first_air_date_year={show.air_year}&page=1"
-        response = requests.get(url, timeout=60).json()
+        try:
+            query = show.romaji_title.replace(" ", "+")
+            url = f"{COMMON_START_URL}&query={query}&first_air_date_year={show.air_year}&page=1"
+            response = requests.get(url, timeout=60).json()
+        except AttributeError:
+            # if the show has no romaji title mock a response with 0 results
+            response = {"total_results": 0}
+        except Exception as e:
+            print(e)
+            exit(1)
 
         # if there are still no results, search recursively for parent story / prequel
         if response["total_results"] == 0:
