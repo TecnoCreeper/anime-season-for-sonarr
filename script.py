@@ -44,7 +44,9 @@ def main() -> None:
 
     for show in shows:  # try to add the tmdb_id and the tvdb_id to each show
         try:
-            show: Show = search_TMDB_for_show(show, genre_id)
+            # <show> is a class, so it's passed by reference.
+            # The show is updated inside the function, so it doesn't need to return anything.
+            search_TMDB_for_show(show, genre_id)
             tvdb_id: int = get_TVDB_id_from_TMDB_id(show.tmdb_id)
             show.tvdb_id = tvdb_id
             shows_success.append(show)
@@ -106,19 +108,21 @@ def main() -> None:
 def interactive_selection(
     all_shows: list[Show], existing_tvdb_ids: list[int]
 ) -> list[int]:
-    """Interactive selection screen. Returns a list of TVDB IDs of the selected shows."""
+    """Interactive selection screen. Return a list of TVDB IDs of the selected shows."""
 
     romaji: bool = options.romaji
 
+    # fmt: off
     choices = [
         questionary.Choice(
-            # prefer the title based on options, fallback to the other if the preferred one is None
+            # prefer the title specified in the option, fallback to the other if it's None
             title=show.romaji_title if (romaji and show.romaji_title) else show.english_title if show.english_title else show.romaji_title,
             value=show.tvdb_id,
-            disabled="Anime already exists in Sonarr" if show.tvdb_id in existing_tvdb_ids else None,  # fmt: skip
+            disabled="Anime already exists in Sonarr" if show.tvdb_id in existing_tvdb_ids else None,
         )
         for show in all_shows
     ]
+    # fmt: on
 
     selected_shows: list[int] | None = questionary.checkbox(
         "Select anime to add to Sonarr:", choices=choices
@@ -131,7 +135,7 @@ def interactive_selection(
 
 
 def get_shows_in_sonarr(sonarr: arrapi.SonarrAPI) -> list[int]:
-    """Returns the TVDB IDs of the shows in Sonarr."""
+    """Return the TVDB IDs of the shows in Sonarr."""
 
     series = sonarr.all_series()
     tvdb_ids = [int(entry.tvdbId) for entry in series]
@@ -220,8 +224,8 @@ def get_TMDB_genre_id(genre_to_find: str = "Animation") -> int:
     raise Exception(f"[ERROR] Genre '{genre_to_find}' not found.")
 
 
-def search_TMDB_for_show(show: Show, target_genre_id: int) -> Show:
-    """Search for a show on TMDB. Return updated Show."""
+def search_TMDB_for_show(show: Show, target_genre_id: int) -> None:
+    """Search for a show on TMDB, if it's found add the TMDB ID to it."""
 
     COMMON_START_URL = f"https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}"
 
@@ -263,7 +267,7 @@ def search_TMDB_for_show(show: Show, target_genre_id: int) -> Show:
         for result in response["results"]:
             if (target_genre_id in result["genre_ids"]) and (result["origin_country"][0] in TARGET_COUNTRIES):  # fmt: skip
                 show.tmdb_id = int(result["id"])
-                return show
+                return
 
         current_page += 1
         url = f"{COMMON_START_URL}&first_air_date_year={show.air_year}&query={query}&page={current_page}"
@@ -276,7 +280,7 @@ def search_TMDB_for_show(show: Show, target_genre_id: int) -> Show:
 
 
 def search_previous_season(show: Show) -> Show:
-    """Search for the previous season of a show via Anilist API. Returns the previous season (Show object)"""
+    """Search for the previous season of a show via Anilist API. Return the previous season."""
 
     query = """
     query ($id: Int) {
