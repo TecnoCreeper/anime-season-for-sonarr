@@ -93,7 +93,7 @@ class TestScript(unittest.TestCase):
             tmdb_id=119100,
         )
 
-        script.search_TMDB_for_show(input_show, 16)
+        input_show.tmdb_id = script.search_TMDB_for_show(input_show, 16)
 
         self.assertEqual(input_show, expected_output_show)
 

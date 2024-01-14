@@ -29,10 +29,10 @@ If you configured `config.ini` you can run
 python anime_season_for_sonarr.py <year> <season>
 ```
 
-Note: the config file is assumed to be located inside the directory you are running the script from (`./config.ini`), you can pas the path to the config file using the `-c` / `--config` option.
+Note: the config file is assumed to be located inside the directory you are running the script from (`./config.ini`), you can pasp the path to the config file using the `-c` / `--config` option.
 
 # Additional info
-- A log file will be created inside the working directory in case the script encounters errors.
+- Use --log to create a log file inside the working directory. It will contain the anime failed to be found.
 
 # Credits
 This product uses the TMDB API but is not endorsed or certified by TMDB.

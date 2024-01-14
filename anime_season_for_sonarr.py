@@ -1,3 +1,4 @@
+import datetime
 import os
 import time
 from dataclasses import dataclass
@@ -44,9 +45,7 @@ def main() -> None:
 
     for show in shows:  # try to add the tmdb_id and the tvdb_id to each show
         try:
-            # <show> is a class, so it's passed by reference.
-            # The show is updated inside the function, so it doesn't need to return anything.
-            search_TMDB_for_show(show, genre_id)
+            show.tmdb_id = search_TMDB_for_show(show, genre_id)
             tvdb_id: int = get_TVDB_id_from_TMDB_id(show.tmdb_id)
             show.tvdb_id = tvdb_id
             shows_success.append(show)
@@ -66,7 +65,9 @@ def main() -> None:
             file.close()
             file = open("log_search_errors.txt", "a", encoding="utf-8")
 
-        file.write(f"Year: {year} - Season: {season.capitalize()}\n")
+        file.write(
+            f"{datetime.datetime.now()} - Year: {year} - Season: {season.capitalize()}\n"
+        )
         for show in shows_error:
             file.write(f"{show}\n")
         file.write("-----\n")
@@ -75,7 +76,9 @@ def main() -> None:
     try:
         sonarr: arrapi.SonarrAPI = arrapi.SonarrAPI(SONARR_BASE_URL, SONARR_API_KEY)
     except Exception as e:
-        print(e)
+        print(
+            f"-----\n{e}\nCan't connect to Sonarr. Possible fix: check the URL and API key."
+        )
         exit(1)
 
     shows_exist_sonarr: list[int] = get_shows_in_sonarr(sonarr)
@@ -224,39 +227,50 @@ def get_TMDB_genre_id(genre_to_find: str) -> int:
     raise Exception(f"[ERROR] Genre '{genre_to_find}' not found.")
 
 
-def search_TMDB_for_show(show: Show, target_genre_id: int) -> None:
-    """Search for a show on TMDB, if it's found add the TMDB ID to it."""
+def search_TMDB_for_show(show: Show, target_genre_id: int) -> int:
+    """Search for a show on TMDB, if it's found return the TMDB ID."""
 
     COMMON_START_URL = f"https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}"
 
-    try:
-        query = show.english_title.replace(" ", "+")
-        url = f"{COMMON_START_URL}&query={query}&first_air_date_year={show.air_year}&page=1"  # fmt: skip
-        response = requests.get(url, timeout=60).json()
-    except AttributeError:
-        # if the show has no english title mock a response with 0 results
-        response = {"total_results": 0}
-    except Exception as e:
-        print(e)
-        exit(1)
+    titles = (show.english_title, show.romaji_title)
+    include_air_year = (True, False)
 
-    # if there are no results with the english title try using the romaji one
-    if response["total_results"] == 0:
-        try:
-            query = show.romaji_title.replace(" ", "+")
-            url = f"{COMMON_START_URL}&query={query}&first_air_date_year={show.air_year}&page=1"
-            response = requests.get(url, timeout=60).json()
-        except AttributeError:
-            # if the show has no romaji title mock a response with 0 results
-            response = {"total_results": 0}
-        except Exception as e:
-            print(e)
-            exit(1)
+    # search in this order:
+    # 1 - english + air year
+    # 2 - romaji + air year
+    # 3 - english
+    # 4 - romaji
 
-        # if there are still no results, search recursively for parent story / prequel
-        if response["total_results"] == 0:
-            next_show = search_previous_season(show)
-            return search_TMDB_for_show(next_show, target_genre_id)
+    # ends search when the first result is found
+
+    response = None
+
+    for option in include_air_year:
+        for title in titles:
+            try:
+                query = title.replace(" ", "+")
+                url = f"{COMMON_START_URL}&query={query}&page=1"
+                if option:
+                    url += f"&first_air_date_year={show.air_year}"
+                response = requests.get(url, timeout=60).json()
+            except AttributeError:  # thrown by .replace()
+                # if title is None mock a response with 0 results
+                response = {"total_results": 0}
+            except Exception as e:
+                print(e)
+                exit(1)
+
+            if response["total_results"] != 0:
+                break
+        else:  # else block is executed only if the loop ends without breaks
+            response = None
+            continue
+        break  # so if we break in the inner loop we also break out of the outer
+
+    # if there are no results, search recursively for parent story / prequel
+    if not response:
+        next_show = search_previous_season(show)
+        return search_TMDB_for_show(next_show, target_genre_id)
 
     # Iterate through all the results and return the first one with the correct genre and country
     TARGET_COUNTRIES = ("JP", "CN", "KR", "TW", "HK")
@@ -266,8 +280,7 @@ def search_TMDB_for_show(show: Show, target_genre_id: int) -> None:
     while current_page <= last_page:
         for result in response["results"]:
             if (target_genre_id in result["genre_ids"]) and (result["origin_country"][0] in TARGET_COUNTRIES):  # fmt: skip
-                show.tmdb_id = int(result["id"])
-                return
+                return int(result["id"])
 
         current_page += 1
         url = f"{COMMON_START_URL}&first_air_date_year={show.air_year}&query={query}&page={current_page}"
@@ -432,6 +445,17 @@ if __name__ == "__main__":
         action="store_false",
         help="show English titles.",
     )
+    parser.add_argument(
+        "--log",
+        action="store_true",
+        help="write to log file search errors.",
+    )
+    parser.add_argument(
+        "--no-log",
+        dest="log",
+        action="store_false",
+        help="don't write to log file search errors.",
+    )
     parser.add_argument("-k", "--tmdb-api-key", help="[TMDB] API key.")
     parser.add_argument("-u", "--base-url", help="[Sonarr] base URL.")
     parser.add_argument("-a", "--sonarr-api-key", help="[Sonarr] API key.")
@@ -508,6 +532,8 @@ if __name__ == "__main__":
         no_select_all=True,
         romaji=False,
         no_romaji=True,
+        log=False,
+        no_log=True,
         tmdb_api_key="ac395b50e4cb14bd5712fa08b936a447",
         base_url=None,
         sonarr_api_key=None,
