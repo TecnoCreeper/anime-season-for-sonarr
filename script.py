@@ -35,7 +35,7 @@ def main() -> None:
         f"===== Anime Season For Sonarr =====\nYear: {year}\nSeason: {season.capitalize()}\n\nSearching...\n(The search can take a while)\n(The search will continue even after encountering [ERROR]s.)\n"
     )
 
-    genre_id: int = get_TMDB_genre_id()
+    genre_id: int = get_TMDB_genre_id("Animation")
 
     shows: list[Show] = get_season_list(year, season)
 
@@ -214,7 +214,7 @@ def build_TMDB_genre_dict() -> dict[str, int]:
     return genre_dict
 
 
-def get_TMDB_genre_id(genre_to_find: str = "Animation") -> int:
+def get_TMDB_genre_id(genre_to_find: str) -> int:
     """Get the TMDB genre ID for anime."""
 
     genre_dict = build_TMDB_genre_dict()
