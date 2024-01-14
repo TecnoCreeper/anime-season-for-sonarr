@@ -26,7 +26,7 @@ Run the script with `-h` or `--help` to view the options.
 If you configured `config.ini` you can run
 
 ```
-python ./script.py <year> <season>
+python anime_season_for_sonarr.py <year> <season>
 ```
 
 Note: the config file is assumed to be located inside the directory you are running the script from (`./config.ini`), you can pas the path to the config file using the `-c` / `--config` option.

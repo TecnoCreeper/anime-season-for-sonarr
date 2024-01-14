@@ -15,7 +15,7 @@ sys.path.append(parent)
 
 # now we can import the module in the parent directory.
 
-import script
+import anime_season_for_sonarr as script
 
 
 class TestScript(unittest.TestCase):
