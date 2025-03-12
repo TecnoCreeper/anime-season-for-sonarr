@@ -34,6 +34,23 @@ Note: the config file is assumed to be located inside the directory you are runn
 # Additional info
 - Use --log to create a log file inside the working directory. It will contain the anime failed to be found.
 
+# Docker File
+- A Docker file is added to the repository for easy of running. To build the container as anime-sonarr Version 0.0.1:
+``` 
+docker image build -t anime-sonarr:0.0.1 ./
+```
+Any time you update the config file, you need to increment the version tag and run build again.
+To run an interactive shell within the image, run the following with the latest version tag:
+
+```
+docker run -it anime-sonarr:0.0.1
+```
+Once you are in the container, you can run the following to test:
+```
+python anime_season_for_sonarr.py 2024 Fall
+```
+
+
 # Credits
 This product uses the TMDB API but is not endorsed or certified by TMDB.
 
