@@ -57,7 +57,7 @@ def main() -> None:
             shows_error.append(show)
 
     # log error titles to file if there are any
-    if shows_error:
+    if shows_error and options.log:
         try:
             file = open("log_search_errors.txt", "a", encoding="utf-8")
         except FileNotFoundError:
@@ -273,7 +273,6 @@ def search_TMDB_for_show(show: Show, target_genre_id: int) -> int:
         return search_TMDB_for_show(next_show, target_genre_id)
 
     # Iterate through all the results and return the first one with the correct genre and country
-    TARGET_COUNTRIES = ("JP", "CN", "KR", "TW", "HK")
     current_page = response["page"]
     last_page = response["total_pages"]
 
@@ -526,6 +525,12 @@ if __name__ == "__main__":
         action="append",
         help="[Sonarr] tag(s) to add, can be used multiple times to add multiple tags. Example: -t anime -t seasonal -t qBit",
     )
+    parser.add_argument(
+        "--target-countries",
+        help="list of country codes the anime must originate from (according to TMDB)",
+        nargs="*",
+        default=["JP", "CN", "KR", "TW", "HK"],
+    )
 
     parser.set_defaults(
         select_all=False,
@@ -553,4 +558,5 @@ if __name__ == "__main__":
     TMDB_API_KEY = options.tmdb_api_key
     SONARR_BASE_URL = options.base_url
     SONARR_API_KEY = options.sonarr_api_key
+    TARGET_COUNTRIES = set(options.target_countries)
     main()
