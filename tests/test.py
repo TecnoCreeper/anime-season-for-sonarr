@@ -1,20 +1,10 @@
-import os
 import sys
 import unittest
+from pathlib import Path
 
-# import the main script (don't know the proper way to do this)
-
-# get the name of the directory where this file is present.
-current = os.path.dirname(os.path.realpath(__file__))
-
-# get the parent directory name where the current directory is present.
-parent = os.path.dirname(current)
-
-# adding the parent directory to the sys.path.
-sys.path.append(parent)
+sys.path.append(str(Path(__file__).parent.parent))
 
 # now we can import the module in the parent directory.
-
 import anime_season_for_sonarr as script
 
 
