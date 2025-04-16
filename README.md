@@ -1,73 +1,91 @@
 # anime-season-for-sonarr
 
-Choose an anime season (year + season) and select which series you want to add to Sonarr.
+Easily add seasonal anime (by year and season) to Sonarr.
 
-# Download / Setup
+---
 
-## Docker
+## 🚀 Quick Start
 
-```
+Choose your setup method:
+
+### 🐳 Docker
+
+```bash
 git clone https://github.com/TecnoCreeper/anime-season-for-sonarr.git
 cd anime-season-for-sonarr
 ```
 
-## Manual
+Then, to run the script:
 
-**NOTE: tested only on python 3.12.1 with the versions of the packages specified in requirements.txt**
-
-```
-git clone https://github.com/TecnoCreeper/anime-season-for-sonarr.git
-cd anime-season-for-sonarr
-(optional but recommended) create and activate a python virtual environment
-pip install -r requirements.txt
-```
-
-# Configuration
-
--   (REQUIRED) Edit `config.ini` and set the following options:  
-    `base_url, sonarr_api_key, root_folder, quality_profile, language_profile (Sonarr v3 only)`
-
--   (OPTIONAL) Edit the other options to your preferences
-
-Note: every option in the config file can be overridden by command line arguments (so technically you don't need to edit the config file if you pass the required options every time).
-
-# Usage
-
-Run the script with `-h` or `--help` to view the options.
-
-If you configured `config.ini` you can run
-
-## Docker
-
-```
+```bash
 docker compose run --rm anime_season_for_sonarr
 ```
 
-you can pass args to the script normally like this
+To specify a year and season (and other args if you want):
 
+```bash
+docker compose run --rm anime_season_for_sonarr 2025 spring --select-all --romaji
 ```
-docker compose run --rm anime_season_for_sonarr 2025 spring
+
+You can also modify the `command` in `docker-compose.yml` if needed.
+
+---
+
+### 🖥️ Manual (No Docker)
+
+> ⚠️ Tested with Python 3.13 using the package versions in `requirements.txt`.
+
+```bash
+git clone https://github.com/TecnoCreeper/anime-season-for-sonarr.git
+cd anime-season-for-sonarr
+
+# Optional but recommended:
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+# ---
+
+pip install -r requirements.txt
 ```
 
-or edit the docker-compose.yml command
+To run the script:
 
-## Manual
-
-```
+```bash
 python anime_season_for_sonarr.py <year> <season>
 ```
 
-Note: the config file is assumed to be located inside the directory you are running the script from (`./config.ini`), you can pass the path to the config file using the `-c` / `--config` option.
+Use `-h` or `--help` for available options.
 
-# Additional info
+---
 
--   Use --log to create a log file inside the working directory. It will contain the anime failed to be found.
+## ⚙️ Configuration
 
-# Credits
+Before running, **edit `config.ini`** with the following required settings:
 
-This product uses the TMDB API but is not endorsed or certified by TMDB.
+-   `base_url`
+-   `sonarr_api_key`
+-   `root_folder`
+-   `quality_profile`
+-   `language_profile` (Sonarr v3 only)
 
-Thanks to:
+You can also configure the other settings to customize behavior.
+
+> All settings can also be passed/overriden via command-line arguments.
+
+> The script assumes `config.ini` is in the current directory unless specified with `-c` or `--config`.
+
+---
+
+## 📝 Logging
+
+Use the `--log` flag to generate a log file in the current directory. This will list any anime that failed to be found.
+
+---
+
+## Credits
+
+This tool uses the TMDB API but is not endorsed or certified by TMDB.
+
+Special thanks to:
 
 -   [ArrAPI](https://github.com/meisnate12/ArrAPI)
 -   [ConfigArgParse](https://github.com/bw2/ConfigArgParse)

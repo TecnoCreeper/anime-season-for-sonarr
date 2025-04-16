@@ -4,7 +4,8 @@ services:
     anime_season_for_sonarr:
         build: .
         volumes:
-            - ./config.ini:/app/config.ini
+            - ./config.ini:/app/config.ini:ro
+            # - ./logs.txt:/app/log_search_errors.txt
         entrypoint: ["python", "anime_season_for_sonarr.py"]
         # command: ["2025", "spring", "--select-all"]
         network_mode: host
