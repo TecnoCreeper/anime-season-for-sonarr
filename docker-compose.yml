@@ -1,0 +1,10 @@
+name: anime_season_for_sonarr
+
+services:
+    anime_season_for_sonarr:
+        build: .
+        volumes:
+            - ./config.ini:/app/config.ini
+        entrypoint: ["python", "anime_season_for_sonarr.py"]
+        # command: ["2025", "spring", "--select-all"]
+        network_mode: host
