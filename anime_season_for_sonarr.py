@@ -1,12 +1,13 @@
+import argparse
 import datetime
 import os
 import time
 from dataclasses import dataclass
 
 import arrapi
-import configargparse
 import questionary
 import requests
+import tomllib
 
 
 @dataclass
@@ -57,7 +58,7 @@ def main() -> None:
             shows_error.append(show)
 
     # log error titles to file if there are any
-    if shows_error and options.log:
+    if shows_error and config["SCRIPT"]["log"]:
         try:
             file = open("log_search_errors.txt", "a", encoding="utf-8")
         except FileNotFoundError:
@@ -83,7 +84,7 @@ def main() -> None:
 
     shows_exist_sonarr: list[int] = get_shows_in_sonarr(sonarr)
 
-    select_all = options.select_all
+    select_all = config["SCRIPT"]["select-all"]
 
     # if select_all is not enabled, ask the user which series they want to add
     if not select_all:
@@ -113,7 +114,7 @@ def interactive_selection(
 ) -> list[int]:
     """Interactive selection screen. Return a list of TVDB IDs of the selected shows."""
 
-    romaji: bool = options.romaji
+    romaji: bool = config["SCRIPT"]["romaji"]
 
     # fmt: off
     choices = [
@@ -367,20 +368,20 @@ def get_TVDB_id_from_TMDB_id(tmdb_id: int) -> int:
 def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):
     """Add given TVDB IDs to Sonarr."""
 
-    root_folder = options.root_folder
-    quality_profile = options.quality_profile
+    root_folder = config["SONARR"]["root-folder"]
+    quality_profile = config["SONARR"]["quality-profile"]
 
-    language_profile = options.language_profile
+    language_profile = config["SONARR"]["language-profile"]
     if language_profile == "NULL":
         language_profile = None
 
-    monitor = options.monitor
-    season_folder = options.season_folder
-    search = options.search
-    unmet_search = options.unmet_search
-    series_type = options.series_type.lower()
+    monitor = config["SONARR"]["monitor"]
+    season_folder = config["SONARR"]["season-folder"]
+    search = config["SONARR"]["search"]
+    unmet_search = config["SONARR"]["unmet-search"]
+    series_type = config["SONARR"]["series-type"].lower()
 
-    tags = options.tags
+    tags = config["SONARR"]["tags"]
     if not tags:
         tags = None
 
@@ -401,12 +402,10 @@ def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):
 
 
 if __name__ == "__main__":
-    parser = configargparse.ArgParser(
+    parser = argparse.ArgumentParser(
         prog="anime-season-for-sonarr",
         description="Automate bulk adding anime seasons to Sonarr.",
-        epilog="All options can be set from a config file.",
-        default_config_files=["config.ini"],
-        formatter_class=configargparse.ArgumentDefaultsRawHelpFormatter,
+        epilog="Configuration must be set from the config.toml file.",
     )
 
     parser.add_argument("year", nargs=1, type=int, help="year of the anime season.")
@@ -416,147 +415,13 @@ if __name__ == "__main__":
         choices=["winter", "spring", "summer", "fall"],
         help="season of the anime season. Lowercase.",
     )
-    parser.add_argument(
-        "-c",
-        "--config",
-        is_config_file=True,
-        help="set config file path (default behaviour = search for ./config.ini).",
-    )
-    parser.add_argument(
-        "--select-all",
-        action="store_true",
-        help="add automatically to sonarr all anime found without asking.",
-    )
-    parser.add_argument(
-        "--no-select-all",
-        dest="select-all",
-        action="store_false",
-        help="interactive selection of anime to add to sonarr.",
-    )
-    parser.add_argument(
-        "--romaji",
-        action="store_true",
-        help="show Romaji titles instead of English titles.",
-    )
-    parser.add_argument(
-        "--no-romaji",
-        dest="romaji",
-        action="store_false",
-        help="show English titles.",
-    )
-    parser.add_argument(
-        "--log",
-        action="store_true",
-        help="write to log file search errors.",
-    )
-    parser.add_argument(
-        "--no-log",
-        dest="log",
-        action="store_false",
-        help="don't write to log file search errors.",
-    )
-    parser.add_argument("-k", "--tmdb-api-key", help="[TMDB] API key.")
-    parser.add_argument("-u", "--base-url", help="[Sonarr] base URL.")
-    parser.add_argument("-a", "--sonarr-api-key", help="[Sonarr] API key.")
-    parser.add_argument("-r", "--root-folder", help="[Sonarr] series root folder.")
-    parser.add_argument("-q", "--quality-profile", help="[Sonarr] quality profile.")
-    parser.add_argument(
-        "-l",
-        "--language-profile",
-        help="[Sonarr] language profile (Sonarr v3 only).",
-    )
-    parser.add_argument(
-        "-m",
-        "--monitor",
-        choices=[
-            "all",
-            "future",
-            "missing",
-            "existing",
-            "pilot",
-            "firstSeason",
-            "latestSeason",
-            "none",
-        ],
-        help="[Sonarr] series monitor mode.",
-    )
-    parser.add_argument(
-        "--season-folder",
-        action="store_true",
-        help="[Sonarr] use season folder.",
-    )
-    parser.add_argument(
-        "--no-season-folder",
-        dest="season-folder",
-        action="store_false",
-        help="[Sonarr] don't use season folder.",
-    )
-    parser.add_argument(
-        "--search",
-        action="store_true",
-        help="[Sonarr] start searching for missing episodes on add.",
-    )
-    parser.add_argument(
-        "--no-search",
-        dest="search",
-        action="store_false",
-        help="[Sonarr] don't start searching for missing episodes on add.",
-    )
-    parser.add_argument(
-        "--unmet-search",
-        action="store_true",
-        help="[Sonarr] start search for cutoff unmet episodes on add.",
-    )
-    parser.add_argument(
-        "--no-unmet-search",
-        dest="unmet-search",
-        action="store_false",
-        help="[Sonarr] don't start search for cutoff unmet episodes on add.",
-    )
-    parser.add_argument(
-        "-s",
-        "--series-type",
-        choices=["standard", "daily", "anime"],
-        help="[Sonarr] series type.",
-    )
-    parser.add_argument(
-        "-t",
-        "--tags",
-        action="append",
-        help="[Sonarr] tag(s) to add, can be used multiple times to add multiple tags. Example: -t anime -t seasonal -t qBit",
-    )
-    parser.add_argument(
-        "--target-countries",
-        help="list of country codes the anime must originate from (according to TMDB)",
-        nargs="*",
-        default=["JP", "CN", "KR", "TW", "HK"],
-    )
 
-    parser.set_defaults(
-        select_all=False,
-        no_select_all=True,
-        romaji=False,
-        no_romaji=True,
-        log=False,
-        no_log=True,
-        tmdb_api_key="ac395b50e4cb14bd5712fa08b936a447",
-        base_url=None,
-        sonarr_api_key=None,
-        root_folder=None,
-        quality_profile=None,
-        language=None,
-        monitor="all",
-        season_folder=True,
-        no_season_folder=False,
-        search=True,
-        unmet_search=True,
-        no_unmet_search=False,
-        series_type="anime",
-        tags=[],
-    )
     options = parser.parse_args()
-    TMDB_API_KEY = options.tmdb_api_key
-    SONARR_BASE_URL = options.base_url
-    SONARR_API_KEY = options.sonarr_api_key
-    TARGET_COUNTRIES = set(options.target_countries)
+    with open("config.toml", "rb") as file:
+        config = tomllib.load(file)
+
+    TMDB_API_KEY = config["TMDB"]["tmdb-api-key"]
+    SONARR_BASE_URL = config["SONARR"]["base-url"]
+    SONARR_API_KEY = config["SONARR"]["sonarr-api-key"]
+    TARGET_COUNTRIES = set(config["SCRIPT"]["target-countries"])
     main()

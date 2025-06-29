@@ -1,0 +1,51 @@
+# Configuration file in toml format https://toml.io/en/v1.0.0
+
+[SCRIPT]
+select-all = false
+romaji = false
+log = false
+target-countries = ["JP", "CN", "KR", "TW", "HK"]
+
+
+
+[TMDB]
+tmdb-api-key = "ac395b50e4cb14bd5712fa08b936a447"
+
+
+
+[SONARR]
+# Open Sonarr > Copy paste the URL
+base-url = "http://localhost:8989"
+
+# Open Sonarr > Settings > General > Security > API Key
+sonarr-api-key = "REPLACE_WITH_YOURS"
+
+# Open Sonarr > Settings > Media Management > Scroll to bottom > Root Folders > Copy paste the Path
+# Note: windows paths need double backslash
+root-folder = "C:\\example\\path"
+
+# Open Sonarr > Settings > Profiles > Copy paste the Profile's name
+quality-profile = "example-1080p - profile name"
+
+# only for sonarr v3 (example: English), NULL for sonarr v4
+language-profile = "NULL"
+
+# Series monitor mode:
+# all, future, missing, existing, pilot, firstSeason, latestSeason, none
+monitor = "all"
+
+season-folder = true
+
+# Start searching for missing episodes on add:
+search = false
+
+# Start search for cutoff unmet episodes on add:
+unmet-search = false
+
+# standard, daily, anime
+series-type = "anime"
+
+# Comma separated tags inside square brackets
+# tags = ["anime", "seasonal", "qBit"]
+# For no tags:
+tags = []

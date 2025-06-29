@@ -24,7 +24,7 @@ docker compose run --rm anime_season_for_sonarr
 To specify a year and season (and other args if you want):
 
 ```bash
-docker compose run --rm anime_season_for_sonarr 2025 spring --select-all --romaji
+docker compose run --rm anime_season_for_sonarr 2025 spring
 ```
 
 You can also modify the `command` in `docker-compose.yml` if needed.
@@ -53,13 +53,11 @@ To run the script:
 python anime_season_for_sonarr.py <year> <season>
 ```
 
-Use `-h` or `--help` for available options.
-
 ---
 
 ## ⚙️ Configuration
 
-Before running, **edit `config.ini`** with the following required settings:
+Before running, rename `config.toml.example` to `config.toml` and **edit** it with the following required settings:
 
 -   `base_url`
 -   `sonarr_api_key`
@@ -69,15 +67,17 @@ Before running, **edit `config.ini`** with the following required settings:
 
 You can also configure the other settings to customize behavior.
 
-> All settings can also be passed/overriden via command-line arguments.
+Script specific options:
 
-> The script assumes `config.ini` is in the current directory unless specified with `-c` or `--config`.
+| option           | description                                                                       | value                                                                        |
+| ---------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| select-all       | add automatically to sonarr all anime found without asking                        | bool                                                                         |
+| romaji           | show Romaji titles instead of English titles.                                     | bool                                                                         |
+| log              | generate a log file in the current directory. This will list any anime not found. | bool                                                                         |
+| target-countries | country codes the anime must originate from (according to TMDB)                   | list from https://developer.themoviedb.org/reference/configuration-countries |
+| tmdb-api-key     | replace with yours if you want (https://www.themoviedb.org/settings/api)          | api key                                                                      |
 
----
-
-## 📝 Logging
-
-Use the `--log` flag to generate a log file in the current directory. This will list any anime that failed to be found.
+Sonarr specific options are documented in the config file.
 
 ---
 
@@ -85,8 +85,7 @@ Use the `--log` flag to generate a log file in the current directory. This will 
 
 This tool uses the TMDB API but is not endorsed or certified by TMDB.
 
-Special thanks to:
+Thanks to:
 
 -   [ArrAPI](https://github.com/meisnate12/ArrAPI)
--   [ConfigArgParse](https://github.com/bw2/ConfigArgParse)
 -   [questionary](https://github.com/tmbo/questionary)

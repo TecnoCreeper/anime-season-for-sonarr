@@ -161,3 +161,4 @@ cython_debug/
 
 # project specific
 log_search_errors.txt
+config.toml
