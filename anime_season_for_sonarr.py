@@ -9,6 +9,20 @@ import arrapi
 import httpx
 import questionary
 
+ANILIST_API_URL = "https://graphql.anilist.co"
+
+
+@dataclass
+class Show:
+    """Show dataclass."""
+
+    english_title: str
+    romaji_title: str
+    anilist_id: int
+    air_year: int
+    tmdb_id: int | None = None
+    tvdb_id: int | None = None
+
 
 class AniListRateLimiter:
     """Rate limiter for AniList API based on response headers."""
@@ -44,56 +58,6 @@ class AniListRateLimiter:
                 # Fallback: wait 60 seconds as mentioned in docs
                 print("Rate limited. Waiting 60 seconds... (fallback)")
                 time.sleep(60)
-
-
-@dataclass
-class Show:
-    """Show dataclass."""
-
-    english_title: str
-    romaji_title: str
-    anilist_id: int
-    air_year: int
-    tmdb_id: int | None = None
-    tvdb_id: int | None = None
-
-
-ANILIST_API_URL = "https://graphql.anilist.co"
-
-
-def make_anilist_request(query: str, variables: dict) -> dict:
-    """Make a request to the AniList API with proper rate limiting."""
-
-    # Make the request
-    response = client.post(
-        ANILIST_API_URL, json={"query": query, "variables": variables}
-    )
-
-    # Handle rate limiting
-    anilist_rate_limiter.handle_response(response)
-
-    # If we got rate limited, retry the request
-    if response.status_code == 429:
-        print("Retrying request after rate limit...")
-        response = client.post(
-            ANILIST_API_URL, json={"query": query, "variables": variables}
-        )
-        anilist_rate_limiter.handle_response(response)
-
-    # Check for other errors
-    if response.status_code != 200:
-        raise Exception(f"AniList API error: {response.status_code} - {response.text}")
-
-    # Parse response and check for GraphQL errors
-    response_data = response.json()
-
-    if "errors" in response_data and response_data["errors"]:
-        error_messages = [
-            error.get("message", "Unknown error") for error in response_data["errors"]
-        ]
-        raise Exception(f"AniList GraphQL errors: {', '.join(error_messages)}")
-
-    return response_data
 
 
 def main() -> None:
@@ -179,6 +143,11 @@ def main() -> None:
     )
 
 
+def clear_screen() -> None:
+    """Clear the screen."""
+    os.system("cls" if os.name == "nt" else "clear")
+
+
 def interactive_selection(
     all_shows: list[Show], existing_tvdb_ids: list[int]
 ) -> list[int]:
@@ -208,17 +177,39 @@ def interactive_selection(
     return selected_shows
 
 
-def get_shows_in_sonarr(sonarr: arrapi.SonarrAPI) -> list[int]:
-    """Return the TVDB IDs of the shows in Sonarr."""
+def make_anilist_request(query: str, variables: dict) -> dict:
+    """Make a request to the AniList API with proper rate limiting."""
 
-    series = sonarr.all_series()
-    tvdb_ids = [int(entry.tvdbId) for entry in series]
-    return tvdb_ids
+    # Make the request
+    response = client.post(
+        ANILIST_API_URL, json={"query": query, "variables": variables}
+    )
 
+    # Handle rate limiting
+    anilist_rate_limiter.handle_response(response)
 
-def clear_screen() -> None:
-    """Clear the screen."""
-    os.system("cls" if os.name == "nt" else "clear")
+    # If we got rate limited, retry the request
+    if response.status_code == 429:
+        print("Retrying request after rate limit...")
+        response = client.post(
+            ANILIST_API_URL, json={"query": query, "variables": variables}
+        )
+        anilist_rate_limiter.handle_response(response)
+
+    # Check for other errors
+    if response.status_code != 200:
+        raise Exception(f"AniList API error: {response.status_code} - {response.text}")
+
+    # Parse response and check for GraphQL errors
+    response_data = response.json()
+
+    if "errors" in response_data and response_data["errors"]:
+        error_messages = [
+            error.get("message", "Unknown error") for error in response_data["errors"]
+        ]
+        raise Exception(f"AniList GraphQL errors: {', '.join(error_messages)}")
+
+    return response_data
 
 
 def get_season_list(year: int, season: str) -> list[Show]:
@@ -426,6 +417,14 @@ def get_TVDB_id_from_TMDB_id(tmdb_id: int) -> int:
 
     tvdb_id = int(response["tvdb_id"])
     return tvdb_id
+
+
+def get_shows_in_sonarr(sonarr: arrapi.SonarrAPI) -> list[int]:
+    """Return the TVDB IDs of the shows in Sonarr."""
+
+    series = sonarr.all_series()
+    tvdb_ids = [int(entry.tvdbId) for entry in series]
+    return tvdb_ids
 
 
 def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):
