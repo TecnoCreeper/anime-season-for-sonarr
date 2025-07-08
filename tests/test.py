@@ -11,6 +11,7 @@ import anime_season_for_sonarr as script
 class TestScript(unittest.TestCase):
     def setUp(self):
         script.TMDB_API_KEY = "ac395b50e4cb14bd5712fa08b936a447"
+        script.TARGET_COUNTRIES = ["JP", "CN", "KR", "TW", "HK"]
 
     def test_get_season_list(self):
         expected_output_shows = (
