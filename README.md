@@ -31,7 +31,17 @@ You can also modify the `command` in `docker-compose.yml` if needed.
 
 ---
 
-### 🖥️ Manual (No Docker)
+### uv
+
+```bash
+git clone https://github.com/TecnoCreeper/anime-season-for-sonarr.git
+cd anime-season-for-sonarr
+uv run anime_season_for_sonarr.py <year> <season>
+```
+
+---
+
+### pip
 
 > ⚠️ Tested with Python 3.13 using the package versions in `requirements.txt`.
 
