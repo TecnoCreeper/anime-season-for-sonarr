@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "arrapi>=1.4.13",
+    "httpx>=0.28.1",
     "questionary>=2.1.0",
-    "requests>=2.32.4",
     "setuptools<81",
 ]

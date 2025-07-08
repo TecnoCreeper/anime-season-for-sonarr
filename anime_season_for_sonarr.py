@@ -2,12 +2,48 @@ import argparse
 import datetime
 import os
 import time
+import tomllib
 from dataclasses import dataclass
 
 import arrapi
+import httpx
 import questionary
-import requests
-import tomllib
+
+
+class AniListRateLimiter:
+    """Rate limiter for AniList API based on response headers."""
+
+    def __init__(self):
+        self.remaining_requests = 90
+        self.limit = 90
+        self.reset_time = None
+
+    def handle_response(self, response: httpx.Response) -> None:
+        """Process rate limit headers from AniList API response."""
+
+        # Check for rate limit headers
+        if "X-RateLimit-Limit" in response.headers:
+            self.limit = int(response.headers["X-RateLimit-Limit"])
+
+        if "X-RateLimit-Remaining" in response.headers:
+            self.remaining_requests = int(response.headers["X-RateLimit-Remaining"])
+            # print(
+            #     f"AniList rate limit: {self.remaining_requests}/{self.limit} requests remaining"
+            # )
+
+        if "X-RateLimit-Reset" in response.headers:
+            self.reset_time = int(response.headers["X-RateLimit-Reset"])
+
+        # Handle 429 Too Many Requests
+        if response.status_code == 429:
+            if "Retry-After" in response.headers:
+                retry_after = int(response.headers["Retry-After"])
+                print(f"Rate limited. Waiting {retry_after} seconds...")
+                time.sleep(retry_after)
+            else:
+                # Fallback: wait 60 seconds as mentioned in docs
+                print("Rate limited. Waiting 60 seconds... (fallback)")
+                time.sleep(60)
 
 
 @dataclass
@@ -22,8 +58,42 @@ class Show:
     tvdb_id: int | None = None
 
 
-ANILIST_API_COOLDOWN = 0.8  # seconds
 ANILIST_API_URL = "https://graphql.anilist.co"
+
+
+def make_anilist_request(query: str, variables: dict) -> dict:
+    """Make a request to the AniList API with proper rate limiting."""
+
+    # Make the request
+    response = client.post(
+        ANILIST_API_URL, json={"query": query, "variables": variables}
+    )
+
+    # Handle rate limiting
+    anilist_rate_limiter.handle_response(response)
+
+    # If we got rate limited, retry the request
+    if response.status_code == 429:
+        print("Retrying request after rate limit...")
+        response = client.post(
+            ANILIST_API_URL, json={"query": query, "variables": variables}
+        )
+        anilist_rate_limiter.handle_response(response)
+
+    # Check for other errors
+    if response.status_code != 200:
+        raise Exception(f"AniList API error: {response.status_code} - {response.text}")
+
+    # Parse response and check for GraphQL errors
+    response_data = response.json()
+
+    if "errors" in response_data and response_data["errors"]:
+        error_messages = [
+            error.get("message", "Unknown error") for error in response_data["errors"]
+        ]
+        raise Exception(f"AniList GraphQL errors: {', '.join(error_messages)}")
+
+    return response_data
 
 
 def main() -> None:
@@ -181,15 +251,12 @@ def get_season_list(year: int, season: str) -> list[Show]:
 
         variables = {"page": page, "season": season.upper(), "seasonYear": year}
 
-        response = requests.post(
-            ANILIST_API_URL, json={"query": query, "variables": variables}, timeout=60
-        ).json()
-        time.sleep(ANILIST_API_COOLDOWN)  # Avoid rate limiting
+        response_data = make_anilist_request(query, variables)
 
-        has_next_page = response["data"]["Page"]["pageInfo"]["hasNextPage"]
+        has_next_page = response_data["data"]["Page"]["pageInfo"]["hasNextPage"]
         page += 1
 
-        for entry in response["data"]["Page"]["media"]:
+        for entry in response_data["data"]["Page"]["media"]:
             shows.append(
                 Show(
                     english_title=entry["title"]["english"],
@@ -211,7 +278,7 @@ def build_TMDB_genre_dict() -> dict[str, int]:
     """Build a list of TMDB genres."""
 
     url = f"https://api.themoviedb.org/3/genre/movie/list?api_key={TMDB_API_KEY}"
-    response = requests.get(url, timeout=60).json()
+    response = client.get(url).json()
     genre_dict = {}
     for genre in response["genres"]:
         genre_dict.update({genre["name"]: genre["id"]})
@@ -253,7 +320,7 @@ def search_TMDB_for_show(show: Show, target_genre_id: int) -> int:
                 url = f"{COMMON_START_URL}&query={query}&page=1"
                 if option:
                     url += f"&first_air_date_year={show.air_year}"
-                response = requests.get(url, timeout=60).json()
+                response = client.get(url).json()
             except AttributeError:  # thrown by .replace()
                 # if title is None mock a response with 0 results
                 response = {"total_results": 0}
@@ -284,8 +351,7 @@ def search_TMDB_for_show(show: Show, target_genre_id: int) -> int:
 
         current_page += 1
         url = f"{COMMON_START_URL}&first_air_date_year={show.air_year}&query={query}&page={current_page}"
-        time.sleep(ANILIST_API_COOLDOWN)  # Avoid rate limiting
-        response = requests.get(url, timeout=60).json()
+        response = client.get(url).json()
 
     raise Exception(
         f"[ERROR] No result with <genre id: {target_genre_id}> and <target countries: {TARGET_COUNTRIES}> found for <{show}> on TMDB."
@@ -317,15 +383,12 @@ def search_previous_season(show: Show) -> Show:
 
     variables = {"id": show.anilist_id}
 
-    response = requests.post(
-        ANILIST_API_URL, json={"query": query, "variables": variables}, timeout=60
-    ).json()
-    time.sleep(ANILIST_API_COOLDOWN)  # Avoid rate limiting
+    response_data = make_anilist_request(query, variables)
 
     parent_story = None
     prequel = None
 
-    for entry in response["data"]["Media"]["relations"]["edges"]:
+    for entry in response_data["data"]["Media"]["relations"]["edges"]:
         if entry["relationType"] == "PARENT":
             parent_story = Show(
                 english_title=entry["node"]["title"]["english"],
@@ -353,7 +416,7 @@ def get_TVDB_id_from_TMDB_id(tmdb_id: int) -> int:
     """Get the TVDB ID from a TMDB ID."""
 
     url = f"https://api.themoviedb.org/3/tv/{tmdb_id}/external_ids?api_key={TMDB_API_KEY}"  # fmt:skip
-    response = requests.get(url, timeout=60).json()
+    response = client.get(url).json()
 
     if "tvdb_id" not in response:
         raise Exception(f"[ERROR] No TVDB ID field for <TMDB ID: {tmdb_id}>.")
@@ -424,4 +487,6 @@ if __name__ == "__main__":
     SONARR_BASE_URL = config["SONARR"]["base-url"]
     SONARR_API_KEY = config["SONARR"]["sonarr-api-key"]
     TARGET_COUNTRIES = set(config["SCRIPT"]["target-countries"])
-    main()
+    anilist_rate_limiter = AniListRateLimiter()
+    with httpx.Client() as client:
+        main()

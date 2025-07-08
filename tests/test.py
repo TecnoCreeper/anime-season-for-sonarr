@@ -11,7 +11,7 @@ import anime_season_for_sonarr as script
 class TestScript(unittest.TestCase):
     def setUp(self):
         script.TMDB_API_KEY = "ac395b50e4cb14bd5712fa08b936a447"
-        script.TARGET_COUNTRIES = ["JP", "CN", "KR", "TW", "HK"]
+        script.TARGET_COUNTRIES = {"JP", "CN", "KR", "TW", "HK"}
 
     def test_get_season_list(self):
         expected_output_shows = (
@@ -109,6 +109,47 @@ class TestScript(unittest.TestCase):
 
     def test_get_TVDB_id_from_TMDB_id(self):
         self.assertEqual(script.get_TVDB_id_from_TMDB_id(65844), 303867)
+
+    def test_anilist_rate_limiter(self):
+        """Test the AniListRateLimiter class functionality."""
+        from unittest.mock import Mock
+
+        import httpx
+
+        # Test rate limiter initialization
+        rate_limiter = script.AniListRateLimiter()
+        self.assertEqual(rate_limiter.remaining_requests, 90)
+        self.assertEqual(rate_limiter.limit, 90)
+
+        # Test handling of rate limit headers
+        mock_response = Mock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.headers = {
+            "X-RateLimit-Limit": "90",
+            "X-RateLimit-Remaining": "45",
+        }
+
+        rate_limiter.handle_response(mock_response)
+        self.assertEqual(rate_limiter.remaining_requests, 45)
+        self.assertEqual(rate_limiter.limit, 90)
+
+        # Test 429 status code handling
+        mock_response_429 = Mock(spec=httpx.Response)
+        mock_response_429.status_code = 429
+        mock_response_429.headers = {
+            "Retry-After": "1",  # 1 second for testing
+            "X-RateLimit-Remaining": "0",
+        }
+
+        import time
+
+        start_time = time.time()
+        rate_limiter.handle_response(mock_response_429)
+        elapsed_time = time.time() - start_time
+
+        # Should have waited at least 1 second
+        self.assertGreaterEqual(elapsed_time, 1.0)
+        self.assertEqual(rate_limiter.remaining_requests, 0)
 
 
 if __name__ == "__main__":
