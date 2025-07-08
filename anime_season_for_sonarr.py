@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import os
+import sys
 import time
 import tomllib
 from dataclasses import dataclass
@@ -27,7 +28,7 @@ class Show:
 class AniListRateLimiter:
     """Rate limiter for AniList API based on response headers."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.remaining_requests = 90
         self.limit = 90
         self.reset_time = None
@@ -86,27 +87,20 @@ def main() -> None:
             shows_success.append(show)
         except SystemExit as e:
             print(e)
-            exit(1)
+            sys.exit(1)
         except Exception as e:
             print(e)
             shows_error.append(show)
 
     # log error titles to file if there are any
     if shows_error and config["SCRIPT"]["log"]:
-        try:
-            file = open("log_search_errors.txt", "a", encoding="utf-8")
-        except FileNotFoundError:
-            file = open("log_search_errors.txt", "w", encoding="utf-8")
-            file.close()
-            file = open("log_search_errors.txt", "a", encoding="utf-8")
-
-        file.write(
-            f"{datetime.datetime.now()} - Year: {year} - Season: {season.capitalize()}\n"
-        )
-        for show in shows_error:
-            file.write(f"{show}\n")
-        file.write("-----\n")
-        file.close()
+        with open("log_search_errors.txt", "a", encoding="utf-8") as file:
+            file.write(
+                f"{datetime.datetime.now()} - Year: {year} - Season: {season.capitalize()}\n"
+            )
+            for show in shows_error:
+                file.write(f"{show}\n")
+            file.write("-----\n")
 
     try:
         sonarr: arrapi.SonarrAPI = arrapi.SonarrAPI(SONARR_BASE_URL, SONARR_API_KEY)
@@ -114,7 +108,7 @@ def main() -> None:
         print(
             f"-----\n{e}\nCan't connect to Sonarr. Possible fix: check the URL and API key."
         )
-        exit(1)
+        sys.exit(1)
 
     shows_exist_sonarr: list[int] = get_shows_in_sonarr(sonarr)
 
@@ -136,7 +130,7 @@ def main() -> None:
         )
     except Exception as e:
         print(e)
-        exit(1)
+        sys.exit(1)
 
     print(
         f"Added: {added}\nExists: {exists}\nNot Found: {not_found}\nExcluded: {excluded}"
@@ -145,7 +139,7 @@ def main() -> None:
 
 def clear_screen() -> None:
     """Clear the screen."""
-    os.system("cls" if os.name == "nt" else "clear")
+    os.system("cls" if os.name == "nt" else "clear")  # noqa: S605
 
 
 def interactive_selection(
@@ -203,7 +197,7 @@ def make_anilist_request(query: str, variables: dict) -> dict:
     # Parse response and check for GraphQL errors
     response_data = response.json()
 
-    if "errors" in response_data and response_data["errors"]:
+    if response_data.get("errors"):
         error_messages = [
             error.get("message", "Unknown error") for error in response_data["errors"]
         ]
@@ -215,7 +209,6 @@ def make_anilist_request(query: str, variables: dict) -> dict:
 def get_season_list(year: int, season: str) -> list[Show]:
     """Get the list of anime from Anilist API for the given season."""
 
-    shows: list[Show] = []
     page = 1
     has_next_page = None
 
@@ -247,15 +240,15 @@ def get_season_list(year: int, season: str) -> list[Show]:
         has_next_page = response_data["data"]["Page"]["pageInfo"]["hasNextPage"]
         page += 1
 
-        for entry in response_data["data"]["Page"]["media"]:
-            shows.append(
-                Show(
-                    english_title=entry["title"]["english"],
-                    romaji_title=entry["title"]["romaji"],
-                    anilist_id=entry["id"],
-                    air_year=entry["seasonYear"],
-                )
+        shows = [
+            Show(
+                english_title=entry["title"]["english"],
+                romaji_title=entry["title"]["romaji"],
+                anilist_id=entry["id"],
+                air_year=entry["seasonYear"],
             )
+            for entry in response_data["data"]["Page"]["media"]
+        ]
 
     if not shows:  # if no shows are found (the list is empty)
         raise Exception(
@@ -317,7 +310,7 @@ def search_TMDB_for_show(show: Show, target_genre_id: int) -> int:
                 response = {"total_results": 0}
             except Exception as e:
                 print(e)
-                exit(1)
+                sys.exit(1)
 
             if response["total_results"] != 0:
                 break
@@ -415,19 +408,17 @@ def get_TVDB_id_from_TMDB_id(tmdb_id: int) -> int:
     if response["tvdb_id"] is None:
         raise Exception(f"[ERROR] TVDB ID is None for <TMDB ID: {tmdb_id}>.")
 
-    tvdb_id = int(response["tvdb_id"])
-    return tvdb_id
+    return int(response["tvdb_id"])
 
 
 def get_shows_in_sonarr(sonarr: arrapi.SonarrAPI) -> list[int]:
     """Return the TVDB IDs of the shows in Sonarr."""
 
     series = sonarr.all_series()
-    tvdb_ids = [int(entry.tvdbId) for entry in series]
-    return tvdb_ids
+    return [int(entry.tvdbId) for entry in series]
 
 
-def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):
+def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):  # noqa: ANN201
     """Add given TVDB IDs to Sonarr."""
 
     root_folder = config["SONARR"]["root-folder"]

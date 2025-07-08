@@ -10,3 +10,64 @@ dependencies = [
     "questionary>=2.1.0",
     "setuptools<81",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.2",
+]
+
+[tool.ruff]
+line-length = 88
+indent-width = 4
+target-version = "py313"
+cache-dir = ".ruff_cache"
+
+[tool.ruff.format]
+docstring-code-format = true
+indent-style = "space"
+line-ending = "auto"
+quote-style = "double"
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint]
+select = [
+  "ANN",
+  "ASYNC",
+  "S",
+  "A",
+  "B",
+  "C4",
+  "COM",
+  "E",
+  "W",
+  "EXE",
+  "F",
+  "FLY",
+  "G",
+  "I",
+  "ICN",
+  "ISC",
+  "LOG",
+  "PERF",
+  "PIE",
+  "PT",
+  "PTH",
+  "RET",
+  "RUF",
+  "SIM",
+  "T10",
+  "TRY",
+  "UP",
+  "ARG",
+  "PL",
+  ]
+
+ignore = [
+    "E501",
+    "COM812",
+    "TRY002",
+    "TRY003",
+    "PTH123",
+    "PLR2004",
+    "PT009",
+]

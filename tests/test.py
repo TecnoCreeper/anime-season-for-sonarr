@@ -112,9 +112,9 @@ class TestScript(unittest.TestCase):
 
     def test_anilist_rate_limiter(self):
         """Test the AniListRateLimiter class functionality."""
-        from unittest.mock import Mock
+        from unittest.mock import Mock  # noqa: PLC0415
 
-        import httpx
+        import httpx  # noqa: PLC0415
 
         # Test rate limiter initialization
         rate_limiter = script.AniListRateLimiter()
@@ -141,7 +141,7 @@ class TestScript(unittest.TestCase):
             "X-RateLimit-Remaining": "0",
         }
 
-        import time
+        import time  # noqa: PLC0415
 
         start_time = time.time()
         rate_limiter.handle_response(mock_response_429)
