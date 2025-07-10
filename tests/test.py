@@ -2,6 +2,8 @@ import sys
 import unittest
 from pathlib import Path
 
+import httpx
+
 sys.path.append(str(Path(__file__).parent.parent))
 
 # now we can import the module in the parent directory.
@@ -12,6 +14,11 @@ class TestScript(unittest.TestCase):
     def setUp(self):
         script.TMDB_API_KEY = "ac395b50e4cb14bd5712fa08b936a447"
         script.TARGET_COUNTRIES = {"JP", "CN", "KR", "TW", "HK"}
+        script.client = httpx.Client()
+        script.anilist_rate_limiter = script.AniListRateLimiter()
+
+    def tearDown(self):
+        script.client.close()
 
     def test_get_season_list(self):
         expected_output_shows = (
@@ -113,8 +120,6 @@ class TestScript(unittest.TestCase):
     def test_anilist_rate_limiter(self):
         """Test the AniListRateLimiter class functionality."""
         from unittest.mock import Mock  # noqa: PLC0415
-
-        import httpx  # noqa: PLC0415
 
         # Test rate limiter initialization
         rate_limiter = script.AniListRateLimiter()

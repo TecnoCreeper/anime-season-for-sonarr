@@ -211,6 +211,7 @@ def get_season_list(year: int, season: str) -> list[Show]:
 
     page = 1
     has_next_page = None
+    shows: list[Show] = []
 
     while (page == 1) or has_next_page:
         query = """
@@ -240,7 +241,7 @@ def get_season_list(year: int, season: str) -> list[Show]:
         has_next_page = response_data["data"]["Page"]["pageInfo"]["hasNextPage"]
         page += 1
 
-        shows = [
+        shows.extend(
             Show(
                 english_title=entry["title"]["english"],
                 romaji_title=entry["title"]["romaji"],
@@ -248,7 +249,7 @@ def get_season_list(year: int, season: str) -> list[Show]:
                 air_year=entry["seasonYear"],
             )
             for entry in response_data["data"]["Page"]["media"]
-        ]
+        )
 
     if not shows:  # if no shows are found (the list is empty)
         raise Exception(
