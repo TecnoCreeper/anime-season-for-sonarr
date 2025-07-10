@@ -25,40 +25,47 @@ class Show:
     tvdb_id: int | None = None
 
 
-class AniListRateLimiter:
-    """Rate limiter for AniList API based on response headers."""
+class AnilistRequestHandler:
+    @staticmethod
+    def send_request(query: str, variables: dict) -> dict:
+        while True:
+            response = client.post(
+                ANILIST_API_URL, json={"query": query, "variables": variables}
+            )
+            ratelimited = AnilistRequestHandler._handle_ratelimit(response)
 
-    def __init__(self) -> None:
-        self.remaining_requests = 90
-        self.limit = 90
-        self.reset_time = None
+            # Parse response and check for GraphQL errors
+            response_data = response.json()
+            if response_data.get("errors"):
+                error_messages = [
+                    error.get("message", "Unknown error")
+                    for error in response_data["errors"]
+                ]
+                raise Exception(f"AniList GraphQL errors: {', '.join(error_messages)}")
 
-    def handle_response(self, response: httpx.Response) -> None:
-        """Process rate limit headers from AniList API response."""
+            if not ratelimited:
+                return response_data
 
-        # Check for rate limit headers
-        if "X-RateLimit-Limit" in response.headers:
-            self.limit = int(response.headers["X-RateLimit-Limit"])
-
-        if "X-RateLimit-Remaining" in response.headers:
-            self.remaining_requests = int(response.headers["X-RateLimit-Remaining"])
-            # print(
-            #     f"AniList rate limit: {self.remaining_requests}/{self.limit} requests remaining"
-            # )
-
-        if "X-RateLimit-Reset" in response.headers:
-            self.reset_time = int(response.headers["X-RateLimit-Reset"])
-
-        # Handle 429 Too Many Requests
+    @staticmethod
+    def _handle_ratelimit(response: httpx.Response) -> bool:
         if response.status_code == 429:
             if "Retry-After" in response.headers:
                 retry_after = int(response.headers["Retry-After"])
                 print(f"Rate limited. Waiting {retry_after} seconds...")
                 time.sleep(retry_after)
             else:
-                # Fallback: wait 60 seconds as mentioned in docs
+                # Fallback: wait 60 seconds
                 print("Rate limited. Waiting 60 seconds... (fallback)")
                 time.sleep(60)
+            return True
+
+        # Check for other errors
+        if response.status_code != 200:
+            raise Exception(
+                f"AniList API error: {response.status_code} - {response.text}"
+            )
+
+        return False
 
 
 def main() -> None:
@@ -152,7 +159,7 @@ def interactive_selection(
     # fmt: off
     choices = [
         questionary.Choice(
-            # prefer the title specified in the option, fallback to the other if it's None
+            # prefer the title specified in the config; fallback to the romaji if the english one is None
             title=show.romaji_title if (romaji and show.romaji_title) else show.english_title if show.english_title else show.romaji_title,
             value=show.tvdb_id,
             disabled="Anime already exists in Sonarr" if show.tvdb_id in existing_tvdb_ids else None,
@@ -169,41 +176,6 @@ def interactive_selection(
         raise TypeError("[ERROR] No shows selected.")
 
     return selected_shows
-
-
-def make_anilist_request(query: str, variables: dict) -> dict:
-    """Make a request to the AniList API with proper rate limiting."""
-
-    # Make the request
-    response = client.post(
-        ANILIST_API_URL, json={"query": query, "variables": variables}
-    )
-
-    # Handle rate limiting
-    anilist_rate_limiter.handle_response(response)
-
-    # If we got rate limited, retry the request
-    if response.status_code == 429:
-        print("Retrying request after rate limit...")
-        response = client.post(
-            ANILIST_API_URL, json={"query": query, "variables": variables}
-        )
-        anilist_rate_limiter.handle_response(response)
-
-    # Check for other errors
-    if response.status_code != 200:
-        raise Exception(f"AniList API error: {response.status_code} - {response.text}")
-
-    # Parse response and check for GraphQL errors
-    response_data = response.json()
-
-    if response_data.get("errors"):
-        error_messages = [
-            error.get("message", "Unknown error") for error in response_data["errors"]
-        ]
-        raise Exception(f"AniList GraphQL errors: {', '.join(error_messages)}")
-
-    return response_data
 
 
 def get_season_list(year: int, season: str) -> list[Show]:
@@ -236,7 +208,7 @@ def get_season_list(year: int, season: str) -> list[Show]:
 
         variables = {"page": page, "season": season.upper(), "seasonYear": year}
 
-        response_data = make_anilist_request(query, variables)
+        response_data = AnilistRequestHandler.send_request(query, variables)
 
         has_next_page = response_data["data"]["Page"]["pageInfo"]["hasNextPage"]
         page += 1
@@ -368,7 +340,7 @@ def search_previous_season(show: Show) -> Show:
 
     variables = {"id": show.anilist_id}
 
-    response_data = make_anilist_request(query, variables)
+    response_data = AnilistRequestHandler.send_request(query, variables)
 
     parent_story = None
     prequel = None
@@ -478,6 +450,5 @@ if __name__ == "__main__":
     SONARR_BASE_URL = config["SONARR"]["base-url"]
     SONARR_API_KEY = config["SONARR"]["sonarr-api-key"]
     TARGET_COUNTRIES = set(config["SCRIPT"]["target-countries"])
-    anilist_rate_limiter = AniListRateLimiter()
     with httpx.Client() as client:
         main()
