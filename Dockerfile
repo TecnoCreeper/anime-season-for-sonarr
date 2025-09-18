@@ -1,11 +1,9 @@
-FROM python:3.13-alpine
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
 WORKDIR /app
 
-COPY anime_season_for_sonarr.py ./
-COPY config.ini ./
-COPY requirements.txt ./
+COPY pyproject.toml .
+COPY uv.lock .
+COPY anime_season_for_sonarr.py .
 
-RUN pip install --no-cache-dir -r requirements.txt
-
-CMD ["python", "anime_season_for_sonarr.py"]
+ENTRYPOINT ["uv", "run", "--locked", "--no-dev", "anime_season_for_sonarr.py"]

@@ -1,13 +1,13 @@
 [project]
 name = "anime-season-for-sonarr"
-version = "0.1.0"
+version = "0.1.1"
 description = "Bulk add anime to Sonarr from a given anime season."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "arrapi>=1.4.13",
+    "arrapi>=1.4.14",
     "httpx>=0.28.1",
-    "questionary>=2.1.0",
+    "questionary>=2.1.1",
     "setuptools<81",
 ]
 

@@ -6,6 +6,5 @@ services:
         volumes:
             - ./config.toml:/app/config.toml:ro
             # - ./logs.txt:/app/log_search_errors.txt
-        entrypoint: ["python", "anime_season_for_sonarr.py"]
         # command: ["2025", "spring"]
         network_mode: host
