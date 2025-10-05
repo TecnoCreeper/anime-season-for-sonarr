@@ -1,6 +1,6 @@
 [project]
 name = "anime-season-for-sonarr"
-version = "0.1.1"
+version = "0.2.0"
 description = "Bulk add anime to Sonarr from a given anime season."
 readme = "README.md"
 requires-python = ">=3.13"
