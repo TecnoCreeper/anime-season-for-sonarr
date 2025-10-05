@@ -2,9 +2,19 @@
 
 Easily bulk add seasonal anime (by year and season) to Sonarr.
 
+## Features
+
+-   Choose the language in which titles are shown during selection (english/romaji)
+-   Filter results by genres and tags
+-   Configure Sonarr settings (quality profile, tags, etc.)
+-   Supports adding all results without manual selection.
+
 ---
 
 ## 🚀 Quick Start
+
+> [!IMPORTANT]  
+> Anilist API randomly responds with a 500 Bad Request. I have not figured out the cause. If it happens to you try re-running the search and/or wait a bit.
 
 Clone the repo and choose your setup method
 
@@ -13,21 +23,17 @@ git clone https://github.com/TecnoCreeper/anime-season-for-sonarr.git
 cd anime-season-for-sonarr
 ```
 
-### 🐳 Docker
+### Docker
 
 ```bash
-docker compose run --rm anime_season_for_sonarr 2025 spring
+docker compose run --rm anime_season_for_sonarr <year> <season>
 ```
-
----
 
 ### uv
 
 ```bash
 uv run anime_season_for_sonarr.py <year> <season>
 ```
-
----
 
 ### pip
 
@@ -71,6 +77,8 @@ Script specific options:
 | log              | generate a log file in the current directory. It list anime not found.   | bool                                                                         |
 | target-countries | country codes the anime must originate from (according to TMDB)          | list from https://developer.themoviedb.org/reference/configuration-countries |
 | tmdb-api-key     | replace with yours if you want (https://www.themoviedb.org/settings/api) | api key                                                                      |
+
+Genres/tags filtering is supported. Filters are applied as "AND".
 
 Sonarr specific options are documented in the config file.
 

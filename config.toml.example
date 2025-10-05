@@ -8,6 +8,17 @@ target-countries = ["JP", "CN", "KR", "TW", "HK"]
 
 
 
+[ANILIST]
+# Comma separated quoted strings
+# Use the --tag-list option to get the list of genres and tags
+# Example: includes-genres = ["comedy", "slice of life"]
+includes-genres = []
+excludes-genres = []
+includes-tags = []
+excludes-tags = []
+
+
+
 [TMDB]
 tmdb-api-key = "ac395b50e4cb14bd5712fa08b936a447"
 
@@ -45,7 +56,6 @@ unmet-search = false
 # standard, daily, anime
 series-type = "anime"
 
-# Comma separated tags inside square brackets
-# tags = ["anime", "seasonal", "qBit"]
-# For no tags:
+# Comma separated quoted tags inside square brackets
+# Example: tags = ["anime", "seasonal", "qBit"]
 tags = []

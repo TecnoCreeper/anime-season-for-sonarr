@@ -27,12 +27,12 @@ class Show:
 
 class AnilistRequestHandler:
     @staticmethod
-    def send_request(query: str, variables: dict) -> dict:
+    def send_request(query: str, variables: dict | None = None) -> dict:
         while True:
             response = client.post(
                 ANILIST_API_URL, json={"query": query, "variables": variables}
             )
-            ratelimited = AnilistRequestHandler._handle_ratelimit(response)
+            retry = AnilistRequestHandler._handle_outcome(response)
 
             # Parse response and check for GraphQL errors
             response_data = response.json()
@@ -43,11 +43,11 @@ class AnilistRequestHandler:
                 ]
                 raise Exception(f"AniList GraphQL errors: {', '.join(error_messages)}")
 
-            if not ratelimited:
+            if not retry:
                 return response_data
 
     @staticmethod
-    def _handle_ratelimit(response: httpx.Response) -> bool:
+    def _handle_outcome(response: httpx.Response) -> bool:
         if response.status_code == 429:
             if "Retry-After" in response.headers:
                 retry_after = int(response.headers["Retry-After"])
@@ -62,26 +62,32 @@ class AnilistRequestHandler:
         # Check for other errors
         if response.status_code != 200:
             raise Exception(
-                f"AniList API error: {response.status_code} - {response.text}"
+                f"AniList API error: {response.status_code=} - {response.text=}"
             )
 
         return False
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0915
     """Main function."""
 
-    year = options.year[0]
-    season = options.season[0]
+    year: int = options.year
+    season: str = options.season
+    genres_include: list[str] = config["ANILIST"]["includes-genres"]
+    genres_exclude: list[str] = config["ANILIST"]["excludes-genres"]
+    tags_include: list[str] = config["ANILIST"]["includes-tags"]
+    tags_exclude: list[str] = config["ANILIST"]["excludes-tags"]
 
     clear_screen()
     print(
-        f"===== Anime Season For Sonarr =====\nYear: {year}\nSeason: {season.capitalize()}\n\nSearching...\n(The search can take a while)\n(The search will continue even after encountering [ERROR]s.)\n"
+        f"===== Anime Season For Sonarr =====\nYear: {year}\nSeason: {season.capitalize()}\n\nSearching...\n"
     )
 
     genre_id: int = get_TMDB_genre_id("Animation")
 
-    shows: list[Show] = get_season_list(year, season)
+    shows: list[Show] = get_season_list(
+        year, season, genres_include, genres_exclude, tags_include, tags_exclude
+    )
 
     shows_success: list[Show] = []  # contains shows that are found successfully
     shows_error: list[Show] = []  # contains shows that encountered an error
@@ -108,6 +114,12 @@ def main() -> None:
             for show in shows_error:
                 file.write(f"{show}\n")
             file.write("-----\n")
+
+    if not shows_success:
+        print(
+            "The search concluded with no anime that has a TVDB ID, so nothing can get added to Sonarr."
+        )
+        sys.exit(1)
 
     try:
         sonarr: arrapi.SonarrAPI = arrapi.SonarrAPI(SONARR_BASE_URL, SONARR_API_KEY)
@@ -149,6 +161,38 @@ def clear_screen() -> None:
     os.system("cls" if os.name == "nt" else "clear")  # noqa: S605
 
 
+def get_genre_and_tag_list() -> tuple[list, list]:
+    """
+    Returns the list of genres and tags.
+
+    Adult tags are excluded.
+    """
+
+    query = """
+    query {
+        genres: GenreCollection
+        tags: MediaTagCollection {
+            name
+            description
+            category
+            isAdult
+        }
+    }
+    """
+
+    response_data = AnilistRequestHandler.send_request(query)
+
+    genres: list = response_data["data"]["genres"]
+
+    tags: list = list(
+        filter(lambda tag: tag["isAdult"] is False, response_data["data"]["tags"])
+    )
+    for tag in tags:
+        del tag["isAdult"]
+
+    return genres, tags
+
+
 def interactive_selection(
     all_shows: list[Show], existing_tvdb_ids: list[int]
 ) -> list[int]:
@@ -178,7 +222,14 @@ def interactive_selection(
     return selected_shows
 
 
-def get_season_list(year: int, season: str) -> list[Show]:
+def get_season_list(  # noqa: PLR0913
+    year: int,
+    season: str,
+    genres_include: list[str] | None = None,
+    genres_exclude: list[str] | None = None,
+    tags_include: list[str] | None = None,
+    tags_exclude: list[str] | None = None,
+) -> list[Show]:
     """Get the list of anime from Anilist API for the given season."""
 
     page = 1
@@ -186,15 +237,54 @@ def get_season_list(year: int, season: str) -> list[Show]:
     shows: list[Show] = []
 
     while (page == 1) or has_next_page:
-        query = """
-        query ($page: Int, $season: MediaSeason, $seasonYear: Int) {
-            Page(page: $page, perPage: 30) {
+        variables = {
+            "page": page,
+            "season": season.upper(),
+            "seasonYear": year,
+        }
+
+        # Ugly string manipulation because of how graphql variables work
+        query1 = """
+        query (
+        $page: Int,
+        $season: MediaSeason,
+        $seasonYear: Int,
+        """
+
+        query2 = """
+        ) {
+            Page (page: $page, perPage: 30) {
                 pageInfo {
                     hasNextPage
                     currentPage
                     lastPage
                 }
-                media(season: $season, seasonYear: $seasonYear, type: ANIME, format: TV) {
+                media (
+                    season: $season,
+                    seasonYear: $seasonYear,
+                    type: ANIME,
+                    format: TV,
+        """
+
+        if genres_include:
+            query1 += "$genres_include: [String],"
+            query2 += "genre_in: $genres_include,"
+            variables.update({"genres_include": genres_include})
+        if genres_exclude:
+            query1 += "$genres_exclude: [String],"
+            query2 += "genre_not_in: $genres_exclude,"
+            variables.update({"genres_exclude": genres_exclude})
+        if tags_include:
+            query1 += "$tags_include: [String],"
+            query2 += "tag_in: $tags_include,"
+            variables.update({"tags_include": tags_include})
+        if tags_exclude:
+            query1 += "$tags_exclude: [String],"
+            query2 += "tag_not_in: $tags_exclude,"
+            variables.update({"tags_exclude": tags_exclude})
+
+        query2 += """
+                ) {
                     id
                     title {
                         romaji
@@ -206,7 +296,7 @@ def get_season_list(year: int, season: str) -> list[Show]:
         }
         """
 
-        variables = {"page": page, "season": season.upper(), "seasonYear": year}
+        query = query1 + query2
 
         response_data = AnilistRequestHandler.send_request(query, variables)
 
@@ -225,7 +315,7 @@ def get_season_list(year: int, season: str) -> list[Show]:
 
     if not shows:  # if no shows are found (the list is empty)
         raise Exception(
-            f"[ERROR] No titles found from Anilist API. Series for <year: {year} season: {season}> don't exist."
+            f"[ERROR] No anime in {year=}, {season=} with the configured genres/tags."
         )
 
     return shows
@@ -430,19 +520,60 @@ def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):  # noqa
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="anime-season-for-sonarr",
-        description="Automate bulk adding anime seasons to Sonarr.",
-        epilog="Configuration must be set from the config.toml file.",
+        description="Script to bulk add seasonal anime to Sonarr.",
+        epilog="Configure the script with config.toml.",
     )
 
-    parser.add_argument("year", nargs=1, type=int, help="year of the anime season.")
+    parser.add_argument("year", nargs="?", type=int, help="year of the anime season.")
     parser.add_argument(
         "season",
-        nargs=1,
+        nargs="?",
         choices=["winter", "spring", "summer", "fall"],
         help="season of the anime season. Lowercase.",
     )
+    parser.add_argument(
+        "--tag-list",
+        nargs="?",
+        choices=["simple", "fancy"],
+        const="fancy",
+        help="Print genres and tags.",
+    )
 
     options = parser.parse_args()
+
+    if options.tag_list:
+        with httpx.Client() as client:
+            genres, tags = get_genre_and_tag_list()
+
+        if options.tag_list == "fancy":
+            from tabulate import tabulate
+
+            print(
+                tabulate(
+                    ([x] for x in genres), headers=["Genres"], tablefmt="mixed_grid"
+                )
+            )
+
+            print(
+                "\nTag list\n"
+                + tabulate(
+                    tags,
+                    headers="keys",
+                    maxcolwidths=[None, 50, None, None],
+                    tablefmt="mixed_grid",
+                )
+            )
+
+        elif options.tag_list == "simple":
+            print("== Genres ==\n" + "\n".join(genres))
+            print("\n== Tags ==\n" + "\n".join([tag["name"] for tag in tags]))
+
+        sys.exit(0)
+
+    elif (not options.year) or (not options.season):
+        print("Error: use --help to see usage.")
+        sys.exit(1)
+
     with open("config.toml", "rb") as file:
         config = tomllib.load(file)
 

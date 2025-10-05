@@ -19,7 +19,7 @@ class TestScript(unittest.TestCase):
     def tearDown(self):
         script.client.close()
 
-    def test_get_season_list(self):
+    def test_get_season_list_no_filters(self):
         shows = script.get_season_list(2021, "spring")
 
         expected_output = (
@@ -104,11 +104,32 @@ class TestScript(unittest.TestCase):
         import time  # noqa: PLC0415
 
         start_time = time.time()
-        script.AnilistRequestHandler._handle_ratelimit(mock_response_429)
+        script.AnilistRequestHandler._handle_outcome(mock_response_429)
         elapsed_time = time.time() - start_time
 
         # Should have waited at least 1 second
         self.assertGreaterEqual(elapsed_time, 1.0)
+
+    def test_filtering(self):
+        shows = script.get_season_list(
+            2025,
+            "fall",
+            genres_include=["comedy", "slice of life"],
+            genres_exclude=["romance"],
+            tags_include=["work"],
+            tags_exclude=["Parody"],
+        )
+
+        expected_output = script.Show(
+            english_title="A Mangaka's Weirdly Wonderful Workplace",
+            romaji_title="Egao no Taenai Shokuba desu.",
+            anilist_id=173523,
+            air_year=2025,
+            tmdb_id=None,
+            tvdb_id=None,
+        )
+
+        self.assertEqual(shows[0], expected_output)
 
 
 if __name__ == "__main__":
