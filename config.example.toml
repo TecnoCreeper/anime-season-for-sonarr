@@ -1,15 +1,11 @@
-# Configuration file in toml format https://toml.io/en/v1.0.0
-
 [SCRIPT]
 select-all = false
 romaji = false
 log = false
 target-countries = ["JP", "CN", "KR", "TW", "HK"]
 
-
-
 [ANILIST]
-# Comma separated quoted strings
+# Comma separated strings
 # Use the --tag-list option to get the list of genres and tags
 # Example: includes-genres = ["comedy", "slice of life"]
 includes-genres = []
@@ -17,12 +13,8 @@ excludes-genres = []
 includes-tags = []
 excludes-tags = []
 
-
-
 [TMDB]
 tmdb-api-key = "ac395b50e4cb14bd5712fa08b936a447"
-
-
 
 [SONARR]
 # Open Sonarr > Copy paste the URL

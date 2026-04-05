@@ -2,7 +2,7 @@ import sys
 import unittest
 from pathlib import Path
 
-import httpx
+import niquests
 
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -11,15 +11,15 @@ import anime_season_for_sonarr as script
 
 
 class TestScript(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         script.TMDB_API_KEY = "ac395b50e4cb14bd5712fa08b936a447"
         script.TARGET_COUNTRIES = {"JP", "CN", "KR", "TW", "HK"}
-        script.client = httpx.Client()
+        script.client = niquests.Session()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         script.client.close()
 
-    def test_get_season_list_no_filters(self):
+    def test_get_season_list_no_filters(self) -> None:
         shows = script.get_season_list(2021, "spring")
 
         expected_output = (
@@ -46,10 +46,10 @@ class TestScript(unittest.TestCase):
         # and that the number of items is correct
         self.assertEqual(len(shows), 47)
 
-    def test_get_TMDB_genre_id(self):
+    def test_get_TMDB_genre_id(self) -> None:
         self.assertEqual(script.get_TMDB_genre_id("Animation"), 16)
 
-    def test_search_TMDB_for_show(self):
+    def test_search_TMDB_for_show(self) -> None:
         test_input = script.Show(
             english_title="BOCCHI THE ROCK!",
             romaji_title="Bocchi the Rock!",
@@ -69,7 +69,7 @@ class TestScript(unittest.TestCase):
 
         self.assertEqual(test_input, expected_output)
 
-    def test_search_previous_season(self):
+    def test_search_previous_season(self) -> None:
         test_input = script.Show(
             english_title="Kaguya-sama: Love is War -Ultra Romantic-",
             romaji_title="Kaguya-sama wa Kokurasetai: Ultra Romantic",
@@ -86,15 +86,15 @@ class TestScript(unittest.TestCase):
 
         self.assertEqual(script.search_previous_season(test_input), expected_output)
 
-    def test_get_TVDB_id_from_TMDB_id(self):
+    def test_get_TVDB_id_from_TMDB_id(self) -> None:
         self.assertEqual(script.get_TVDB_id_from_TMDB_id(65844), 303867)
 
-    def test_anilist_rate_limiter(self):
+    def test_anilist_rate_limiter(self) -> None:
         """Test the ratelimiting functionality."""
 
         from unittest.mock import Mock  # noqa: PLC0415
 
-        mock_response_429 = Mock(spec=httpx.Response)
+        mock_response_429 = Mock(spec=niquests.Response)
         mock_response_429.status_code = 429
         mock_response_429.headers = {
             "Retry-After": "1",  # 1 second for testing
@@ -107,10 +107,10 @@ class TestScript(unittest.TestCase):
         script.AnilistRequestHandler._handle_outcome(mock_response_429)
         elapsed_time = time.time() - start_time
 
-        # Should have waited at least 1 second
-        self.assertGreaterEqual(elapsed_time, 1.0)
+        # Should have waited at least 2 second
+        self.assertGreaterEqual(elapsed_time, 2.0)
 
-    def test_filtering(self):
+    def test_filtering(self) -> None:
         shows = script.get_season_list(
             2025,
             "fall",

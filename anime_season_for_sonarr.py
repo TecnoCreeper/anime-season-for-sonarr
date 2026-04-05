@@ -7,7 +7,7 @@ import tomllib
 from dataclasses import dataclass
 
 import arrapi
-import httpx
+import niquests
 import questionary
 
 ANILIST_API_URL = "https://graphql.anilist.co"
@@ -17,7 +17,7 @@ ANILIST_API_URL = "https://graphql.anilist.co"
 class Show:
     """Show dataclass."""
 
-    english_title: str
+    english_title: str | None
     romaji_title: str
     anilist_id: int
     air_year: int
@@ -32,7 +32,7 @@ class AnilistRequestHandler:
             response = client.post(
                 ANILIST_API_URL, json={"query": query, "variables": variables}
             )
-            retry = AnilistRequestHandler._handle_outcome(response)
+            ratelimited = AnilistRequestHandler._handle_outcome(response)
 
             # Parse response and check for GraphQL errors
             response_data = response.json()
@@ -43,14 +43,14 @@ class AnilistRequestHandler:
                 ]
                 raise Exception(f"AniList GraphQL errors: {', '.join(error_messages)}")
 
-            if not retry:
+            if not ratelimited:
                 return response_data
 
     @staticmethod
-    def _handle_outcome(response: httpx.Response) -> bool:
+    def _handle_outcome(response: niquests.Response) -> bool:
         if response.status_code == 429:
             if "Retry-After" in response.headers:
-                retry_after = int(response.headers["Retry-After"])
+                retry_after = int(response.headers["Retry-After"]) + 1
                 print(f"Rate limited. Waiting {retry_after} seconds...")
                 time.sleep(retry_after)
             else:
@@ -68,7 +68,7 @@ class AnilistRequestHandler:
         return False
 
 
-def main() -> None:  # noqa: PLR0915
+def main() -> None:
     """Main function."""
 
     year: int = options.year
@@ -95,8 +95,7 @@ def main() -> None:  # noqa: PLR0915
     for show in shows:  # try to add the tmdb_id and the tvdb_id to each show
         try:
             show.tmdb_id = search_TMDB_for_show(show, genre_id)
-            tvdb_id: int = get_TVDB_id_from_TMDB_id(show.tmdb_id)
-            show.tvdb_id = tvdb_id
+            show.tvdb_id = get_TVDB_id_from_TMDB_id(show.tmdb_id)
             shows_success.append(show)
         except SystemExit as e:
             print(e)
@@ -140,7 +139,7 @@ def main() -> None:  # noqa: PLR0915
         )
     else:  # if select all is enabled, add all shows
         print("Select all enabled. Adding all shows...")
-        selected_shows: list[int] = [show.tvdb_id for show in shows_success]
+        selected_shows: list[int] = [show.tvdb_id for show in shows_success]  # type: ignore
 
     try:
         # Add series to Sonarr
@@ -204,7 +203,7 @@ def interactive_selection(
     choices = [
         questionary.Choice(
             # prefer the title specified in the config; fallback to the romaji if the english one is None
-            title=show.romaji_title if (romaji and show.romaji_title) else show.english_title if show.english_title else show.romaji_title,
+            title=show.romaji_title if romaji else show.english_title if show.english_title else show.romaji_title,
             value=show.tvdb_id,
             disabled="Anime already exists in Sonarr" if show.tvdb_id in existing_tvdb_ids else None,
         )
@@ -358,32 +357,33 @@ def search_TMDB_for_show(show: Show, target_genre_id: int) -> int:
 
     # ends search when the first result is found
 
-    response = None
+    found = False
 
     for option in include_air_year:
         for title in titles:
-            try:
-                query = title.replace(" ", "+")
-                url = f"{COMMON_START_URL}&query={query}&page=1"
-                if option:
-                    url += f"&first_air_date_year={show.air_year}"
-                response = client.get(url).json()
-            except AttributeError:  # thrown by .replace()
-                # if title is None mock a response with 0 results
+            if title is None:
+                # mock a response with 0 results
                 response = {"total_results": 0}
-            except Exception as e:
-                print(e)
-                sys.exit(1)
+            else:
+                try:
+                    query = title.replace(" ", "+")  # type: ignore
+                    url = f"{COMMON_START_URL}&query={query}&page=1"
+                    if option:
+                        url += f"&first_air_date_year={show.air_year}"
+                    response = client.get(url).json()
+                except Exception as e:
+                    print(e)
+                    sys.exit(1)
 
             if response["total_results"] != 0:
+                found = True
                 break
-        else:  # else block is executed only if the loop ends without breaks
-            response = None
-            continue
-        break  # so if we break in the inner loop we also break out of the outer
+
+        if found:
+            break
 
     # if there are no results, search recursively for parent story / prequel
-    if not response:
+    if not found:
         next_show = search_previous_season(show)
         return search_TMDB_for_show(next_show, target_genre_id)
 
@@ -392,7 +392,7 @@ def search_TMDB_for_show(show: Show, target_genre_id: int) -> int:
     last_page = response["total_pages"]
 
     while current_page <= last_page:
-        for result in response["results"]:
+        for result in response["results"]:  # type: ignore
             if (target_genre_id in result["genre_ids"]) and (result["origin_country"][0] in TARGET_COUNTRIES):  # fmt: skip
                 return int(result["id"])
 
@@ -454,7 +454,7 @@ def search_previous_season(show: Show) -> Show:
     if (parent_story is None) and (prequel is None):
         raise Exception(f"[ERROR] No valid relations found for <{show}>.")
 
-    show_to_search: Show = parent_story if parent_story else prequel
+    show_to_search: Show = parent_story if parent_story else prequel  # type: ignore
 
     return show_to_search
 
@@ -478,7 +478,7 @@ def get_shows_in_sonarr(sonarr: arrapi.SonarrAPI) -> list[int]:
     """Return the TVDB IDs of the shows in Sonarr."""
 
     series = sonarr.all_series()
-    return [int(entry.tvdbId) for entry in series]
+    return [int(entry.tvdbId) for entry in series]  # type: ignore
 
 
 def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):  # noqa: ANN201
@@ -502,7 +502,7 @@ def add_series_to_sonarr(tvdb_ids: list[int], sonarr: arrapi.SonarrAPI):  # noqa
         tags = None
 
     added, exists, not_found, excluded = sonarr.add_multiple_series(
-        ids=tvdb_ids,
+        ids=tvdb_ids,  # type: ignore
         root_folder=root_folder,
         quality_profile=quality_profile,
         language_profile=language_profile,
@@ -542,7 +542,7 @@ if __name__ == "__main__":
     options = parser.parse_args()
 
     if options.tag_list:
-        with httpx.Client() as client:
+        with niquests.Session() as client:
             genres, tags = get_genre_and_tag_list()
 
         if options.tag_list == "fancy":
@@ -571,8 +571,8 @@ if __name__ == "__main__":
         sys.exit(0)
 
     elif (not options.year) or (not options.season):
-        print("Error: use --help to see usage.")
-        sys.exit(1)
+        parser.print_help()
+        sys.exit(0)
 
     with open("config.toml", "rb") as file:
         config = tomllib.load(file)
@@ -581,5 +581,5 @@ if __name__ == "__main__":
     SONARR_BASE_URL = config["SONARR"]["base-url"]
     SONARR_API_KEY = config["SONARR"]["sonarr-api-key"]
     TARGET_COUNTRIES = set(config["SCRIPT"]["target-countries"])
-    with httpx.Client() as client:
+    with niquests.Session() as client:
         main()
